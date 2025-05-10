@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product_model.dart';
 import '../widgets/product_card.dart';
 import '../widgets/shimmer_widget.dart';
+import '../widgets/custom_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -11,6 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isLoading = true;
   List<Product> _featuredProducts = [];
   List<Product> _allProducts = [];
@@ -22,9 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    // Simulate network delay
     await Future.delayed(const Duration(seconds: 2));
-    
     setState(() {
       _featuredProducts = Product.getFeaturedProducts();
       _allProducts = Product.sampleProducts;
@@ -35,27 +35,78 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sabba Farm'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // Handle search
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // Handle notifications
-            },
-          ),
-        ],
+      key: _scaffoldKey,
+      drawer: _buildDrawer(),
+      appBar: CustomAppBar(
+        onMenuTap: () {
+          _scaffoldKey.currentState?.openDrawer();
+        },
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: _isLoading ? _buildLoadingView() : _buildContentView(),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: _isLoading
+              ? _buildLoadingView()
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: _buildContentView(),
+                ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF007B4F),
+              Colors.black87,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              _buildDrawerItem(Icons.person_outline, "Profile"),
+              _buildDrawerItem(Icons.widgets_outlined, "Widgets"),
+              _buildDrawerItem(Icons.settings_outlined, "Settings"),
+              _buildDrawerItem(Icons.shopping_cart, "cart"),
+              _buildDrawerItem(Icons.shopping_bag, "orders"),
+              const Spacer(),
+              const Divider(color: Colors.white54),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundImage: AssetImage('assets/profile.jpg'),
+                ),
+                title: const Text(
+                  'Thomas Schneider',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: const Text(
+                  'LOG OUT',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                onTap: () {},
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(IconData icon, String label) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white),
+      title: Text(label, style: const TextStyle(color: Colors.white)),
+      onTap: () {},
     );
   }
 
@@ -64,22 +115,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContentView() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Banner
-          _buildBanner(),
-          
-          // Featured Products Section
-          _buildSectionTitle('Featured Products'),
-          _buildFeaturedProducts(),
-          
-          // All Products Section
-          _buildSectionTitle('All Products'),
-          _buildAllProducts(),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildBanner(),
+        _buildSectionTitle('Featured Products'),
+        _buildFeaturedProducts(),
+        _buildSectionTitle('All Products'),
+        _buildAllProducts(),
+      ],
     );
   }
 
@@ -101,10 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.black.withOpacity(0.7),
-            ],
+            colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
           ),
         ),
         padding: const EdgeInsets.all(16.0),
@@ -122,9 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8.0),
             ElevatedButton(
-              onPressed: () {
-                // Handle shop now
-              },
+              onPressed: () {},
               child: const Text('Shop Now'),
             ),
           ],
@@ -153,10 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           return ProductCard(
             product: _featuredProducts[index],
-            onTap: () {
-              // Handle product tap
-              _showProductDetails(_featuredProducts[index]);
-            },
+            onTap: () => _showProductDetails(_featuredProducts[index]),
           );
         },
       ),
@@ -176,39 +212,27 @@ class _HomeScreenState extends State<HomeScreen> {
       itemBuilder: (context, index) {
         return ProductCard(
           product: _allProducts[index],
-          onTap: () {
-            // Handle product tap
-            _showProductDetails(_allProducts[index]);
-          },
+          onTap: () => _showProductDetails(_allProducts[index]),
         );
       },
     );
   }
 
   void _showProductDetails(Product product) {
-    // For now, just show a simple dialog
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(product.name),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.network(
-              product.imageUrl,
-              height: 150,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
+            Image.network(product.imageUrl, height: 150, fit: BoxFit.cover),
             const SizedBox(height: 16),
             Text(product.description),
             const SizedBox(height: 8),
             Text(
               'Price: \$${product.price.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -219,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // Add to cart logic
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

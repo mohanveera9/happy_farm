@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Colors based on Sabbafarm website
-  static const Color primaryColor = Color(0xFF4CAF50); // Green color from the website
+  static const Color primaryColor =  Color(0xFF007B4F); // Green color from the website
   static const Color accentColor = Color(0xFF8BC34A);  // Light green
   static const Color textDarkColor = Color(0xFF333333);
   static const Color backgroundColor = Color(0xFFF5F5F5);

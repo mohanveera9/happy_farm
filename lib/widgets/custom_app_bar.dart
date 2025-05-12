@@ -10,7 +10,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
-    final appBarHeight = screenHeight * 0.18; // 18% of screen height
+    final appBarHeight = screenHeight * 0.19; // 18% of screen height
 
     return Container(
       height: appBarHeight,
@@ -33,16 +33,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: onMenuTap,
-              ),
               Row(
                 children: const [
                   Icon(Icons.eco, color: Colors.white, size: 24),
                   SizedBox(width: 8),
                   Text(
-                    'SafeFarm',
+                    'SabbaFarm',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -58,7 +54,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                     onPressed: () {},
                   ),
                   IconButton(
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: Colors.white),
                     onPressed: () {},
                   ),
                 ],
@@ -98,5 +95,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight * 2.2); // Approx ~110–120 pixels
+  Size get preferredSize =>
+      const Size.fromHeight(kToolbarHeight * 2.2); // Approx ~110–120 pixels
 }

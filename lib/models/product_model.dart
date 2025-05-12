@@ -7,6 +7,7 @@ class Product {
   final String category;
   final bool isFeatured;
   final double? discountPrice;
+  final double rating;
 
   Product({
     required this.id,
@@ -17,61 +18,49 @@ class Product {
     required this.category,
     this.isFeatured = false,
     this.discountPrice,
+    required this.rating,
   });
 
   // Sample data for demonstration purposes
   static List<Product> sampleProducts = [
     Product(
       id: 1,
-      name: 'Fresh Organic Dates',
-      description: 'Premium quality organic dates from Sabba Farm',
-      price: 19.99,
-      imageUrl: 'https://sabbafarm.com/wp-content/uploads/2023/03/5-1.jpg',
-      category: 'Dates',
+      name: 'Neem Pesticide',
+      description: 'Organic neem-based pesticide for insect control',
+      price: 15.99,
+      imageUrl: 'https://example.com/images/neem_pesticide.jpg',
+      category: 'Pesticides',
       isFeatured: true,
+      rating: 4.3
     ),
     Product(
       id: 2,
-      name: 'Medjool Dates',
-      description: 'Premium Medjool Dates from Sabba Farm',
-      price: 24.99,
-      imageUrl: 'https://sabbafarm.com/wp-content/uploads/2023/03/4-1.jpg',
-      category: 'Dates',
-      isFeatured: true,
-      discountPrice: 22.99,
+      name: 'Tractor Attachment Kit',
+      description: 'Multi-use attachment kit for small tractors',
+      price: 199.99,
+      imageUrl: 'https://example.com/images/tractor_kit.jpg',
+      category: 'Machinery',
+      rating: 4.2
     ),
     Product(
       id: 3,
-      name: 'Ajwa Dates',
-      description: 'Premium Ajwa Dates from Sabba Farm',
-      price: 29.99,
-      imageUrl: 'https://sabbafarm.com/wp-content/uploads/2023/03/8.jpg',
-      category: 'Dates',
+      name: 'Urea Fertilizer',
+      description: 'High quality urea fertilizer for fast growth',
+      price: 10.49,
+      imageUrl: 'https://example.com/images/urea.jpg',
+      category: 'Fertilizers',
+      discountPrice: 8.99,
       isFeatured: true,
+      rating: 4.2
     ),
     Product(
       id: 4,
-      name: 'Sukkari Dates',
-      description: 'Sweet Sukkari Dates from Sabba Farm',
-      price: 17.99,
-      imageUrl: 'https://sabbafarm.com/wp-content/uploads/2023/03/3-1.jpg',
-      category: 'Dates',
-    ),
-    Product(
-      id: 5,
-      name: 'Date Paste',
-      description: 'Natural date paste for cooking and baking',
-      price: 12.99,
-      imageUrl: 'https://sabbafarm.com/wp-content/uploads/2023/03/9.jpg',
-      category: 'Date Products',
-    ),
-    Product(
-      id: 6,
-      name: 'Date Syrup',
-      description: 'Pure natural date syrup',
-      price: 14.99,
-      imageUrl: 'https://sabbafarm.com/wp-content/uploads/2023/03/10.jpg',
-      category: 'Date Products',
+      name: 'Hybrid Paddy Seeds',
+      description: 'High yield hybrid rice seeds',
+      price: 6.49,
+      imageUrl: 'https://example.com/images/rice_seeds.jpg',
+      category: 'Seeds',
+      rating: 2.3
     ),
   ];
 
@@ -82,6 +71,8 @@ class Product {
 
   // Get products by category
   static List<Product> getProductsByCategory(String category) {
-    return sampleProducts.where((product) => product.category == category).toList();
+    return sampleProducts
+        .where((product) => product.category == category)
+        .toList();
   }
 }

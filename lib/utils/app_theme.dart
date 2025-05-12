@@ -2,25 +2,28 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Colors based on Sabbafarm website
-  static const Color primaryColor =  Color(0xFF007B4F); // Green color from the website
-  static const Color accentColor = Color(0xFF8BC34A);  // Light green
+  static const Color primaryColor =
+      Color(0xFF007B4F); // Green color from the website
+  static const Color accentColor = Color(0xFF8BC34A); // Light green
   static const Color textDarkColor = Color(0xFF333333);
   static const Color backgroundColor = Color(0xFFF5F5F5);
-  
+  static const Color secondaryColor = Colors.grey;
+
   // Light theme
   static final ThemeData lightTheme = ThemeData(
     primaryColor: primaryColor,
     colorScheme: ColorScheme.light(
       primary: primaryColor,
       secondary: accentColor,
+      tertiary: Colors.white,
     ),
-    scaffoldBackgroundColor: backgroundColor,
     appBarTheme: const AppBarTheme(
-      backgroundColor: primaryColor,
-      elevation: 0,
-      iconTheme: IconThemeData(color: Colors.white),
+      backgroundColor: Colors.white, // White background
+      elevation: 4, // Adds subtle shadow
+      shadowColor: Colors.black12, // Optional: Customize shadow color
+      iconTheme: IconThemeData(color: AppTheme.textDarkColor), // Dark icons
       titleTextStyle: TextStyle(
-        color: Colors.white,
+        color: AppTheme.textDarkColor, // Dark title text
         fontSize: 20,
         fontWeight: FontWeight.bold,
       ),

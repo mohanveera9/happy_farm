@@ -13,9 +13,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
+  
   bool _isLoading = false;
   String? _errorMessage;
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     setState(() {
@@ -58,140 +59,190 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  InputDecoration _inputDecoration(String label, IconData prefixIcon, {bool isPassword = false}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(
+        color: Colors.grey[600],
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Icon(
+        prefixIcon,
+        color: const Color(0xFF00A64F),
+        size: 22,
+      ),
+      suffixIcon: isPassword
+          ? IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                color: Colors.grey[600],
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            )
+          : null,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16.0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF00A64F), width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.red, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
+      ),
+      // Add a subtle shadow effect
+      floatingLabelBehavior: FloatingLabelBehavior.auto,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).primaryColor,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Container(
-            width: screenWidth > 600 ? 500 : screenWidth * 0.9,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFEAFBF3), Color(0xFFFFFFFF)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const VerticalDivider(
-                      color: Colors.black,
-                      thickness: 1,
-                      width: 20,
-                      indent: 10,
-                      endIndent: 10,
-                    ),
-                    Image.asset('assets/images/logo.png', height: 60),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'SABBA FARM',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF00A64F),
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
+                Image.asset('assets/images/logo.png', height: 80),
+                
                 const SizedBox(height: 24),
                 const Text(
                   'Welcome Back',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 const Text(
-                  'Sign in to continue to Sabba Farm',
+                  'Sign in to continue',
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 40),
 
-                TextField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number *',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
+                // Enhanced Text Fields with decorative container
+                Column(
+                  children: [
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _inputDecoration('Phone Number', Icons.phone_android),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: _inputDecoration('Password', Icons.lock_outline, isPassword: true),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          // Add forgot password functionality
+                        },
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: Color(0xFF00A64F),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
 
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password *',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 3),
 
                 if (_errorMessage != null)
-                  Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                const SizedBox(height: 16),
+                if(_errorMessage != null)
+                  SizedBox(height: 20,),
 
+                // Enhanced Button
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 55,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00A64F),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shadowColor: const Color(0xFF00A64F).withOpacity(0.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     onPressed: _isLoading ? null : _login,
                     child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
                         : const Text(
                             'Sign In',
-                            style: TextStyle(fontSize: 16),
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                           ),
                   ),
                 ),
-                const SizedBox(height: 12),
 
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF00A64F)),
-                    ),
-                    onPressed: () {
-                      _phoneController.clear();
-                      _passwordController.clear();
-                      setState(() {
-                        _errorMessage = null;
-                      });
-                    },
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(color: Color(0xFF00A64F)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 32),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? "),
+                    const Text(
+                      "Don't have an account? ",
+                      style: TextStyle(fontSize: 15),
+                    ),
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -204,6 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(
                           color: Color(0xFF00A64F),
                           fontWeight: FontWeight.bold,
+                          fontSize: 15,
                         ),
                       ),
                     ),

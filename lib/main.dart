@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:happy_farm/screens/cart_screen.dart';
+import 'package:happy_farm/screens/home_screen.dart';
+import 'package:happy_farm/screens/order_screen.dart';
+import 'package:happy_farm/screens/profile_screen.dart';
+import 'package:happy_farm/screens/wishlist_screen.dart';
 // import 'screens/home_screen.dart';
 import 'utils/app_theme.dart';
-import 'screens/login_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,6 +21,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainScreen(),
+      routes: {
+        '/orders': (context) => const OrdersScreen(),
+        '/wishlist': (context) => const WishlistScreen(),
+      },
     );
   }
 }
@@ -30,13 +38,12 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  
+
   static final List<Widget> _screens = [
-    const LoginScreen(),
-    const Center(child: Text('Inventory')),
-  const Center(child: Text('Crop Plan')),
-  const Center(child: Text('Cart')),
-  const Center(child: Text('Account')),
+    HomeScreen(),
+    const Center(child: Text('Category')),
+    CartScreen(),
+    ProfileScreen()
   ];
 
   void _onItemTapped(int index) {
@@ -44,73 +51,65 @@ class _MainScreenState extends State<MainScreen> {
       _selectedIndex = index;
     });
   }
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    body: _screens[_selectedIndex],
 
-    // ✅ Hide BottomNavigationBar on LoginScreen (index == 0)
-    bottomNavigationBar: _selectedIndex == 0
-        ? null
-        : Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF007B4F),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-              child: BottomNavigationBar(
-                type: BottomNavigationBarType.fixed,
-                backgroundColor: const Color(0xFF007B4F),
-                selectedItemColor: Colors.white,
-                unselectedItemColor: Colors.white70,
-                selectedFontSize: 12,
-                unselectedFontSize: 12,
-                currentIndex: _selectedIndex,
-                onTap: _onItemTapped,
-                items: const [
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.home_outlined),
-                    activeIcon: Icon(Icons.home),
-                    label: 'Home',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.inventory_2_outlined),
-                    activeIcon: Icon(Icons.inventory_2),
-                    label: 'Inventory',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.agriculture_outlined),
-                    activeIcon: Icon(Icons.agriculture),
-                    label: 'Crop Plan',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.shopping_cart_outlined),
-                    activeIcon: Icon(Icons.shopping_cart),
-                    label: 'Cart',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline),
-                    activeIcon: Icon(Icons.person),
-                    label: 'Account',
-                  ),
-                ],
-              ),
-            ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.only(top: 5, bottom: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
           ),
-  );
-}
-
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.white,
+            selectedItemColor: AppTheme.primaryColor,
+            unselectedItemColor: Colors.grey,
+            selectedFontSize: 14,
+            unselectedFontSize: 12,
+            currentIndex: _selectedIndex,
+            onTap: _onItemTapped,
+            items: [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.category_outlined),
+                activeIcon: Icon(Icons.category),
+                label: 'Categories',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.shopping_cart_outlined),
+                activeIcon: Icon(Icons.shopping_cart),
+                label: 'Cart',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                activeIcon: Icon(Icons.person),
+                label: 'Account',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

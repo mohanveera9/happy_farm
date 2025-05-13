@@ -1,16 +1,18 @@
-// lib/widgets/custom_app_bar.dart
 import 'package:flutter/material.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onMenuTap;
-
-  const CustomAppBar({Key? key, required this.onMenuTap}) : super(key: key);
-
+  final bool showCloseButton;
+  const CustomAppBar({
+    Key? key,
+    required this.onMenuTap,
+    this.showCloseButton = false,
+  }) : super(key: key);
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
-    final appBarHeight = screenHeight * 0.18; // 18% of screen height
+    final appBarHeight = screenHeight * 0.18;
 
     return Container(
       height: appBarHeight,
@@ -33,24 +35,17 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // IconButton(
-              //   icon: const Icon(Icons.menu, color: Colors.white),
-              //   onPressed: onMenuTap,
-              // ),
-              IconButton(
-                icon: ClipOval(
-                  child: Image.asset(
-                    'assets/images/logo.png', // Replace with the path to your logo image
-                    height: 40, // Adjust the size as needed
-                    width:
-                        40, // Ensure width and height are the same for a perfect circle
-                    fit: BoxFit
-                        .cover, // Ensure the image scales properly within the circle
-                  ),
+              // Logo Image
+              ClipOval(
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.cover,
                 ),
-                onPressed:()=>{} ,
               ),
 
+              // App Title
               Row(
                 children: const [
                   Icon(Icons.eco, color: Colors.white, size: 24),
@@ -65,6 +60,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ],
               ),
+
+              // Icons
               Row(
                 children: [
                   IconButton(
@@ -81,31 +78,45 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // Search Bar
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: const [
-                Icon(Icons.search, color: Colors.grey),
-                SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search Product',
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(vertical: 10),
-                    ),
+
+          // Menu + Search Bar
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  showCloseButton ? Icons.close : Icons.filter_list,
+                  color: Colors.white,
+                ),
+                onPressed: onMenuTap,
+              ),
+              Expanded(
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search Product',
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.mic_none, color: Colors.grey),
+                    ],
                   ),
                 ),
-                Icon(Icons.mic_none, color: Colors.grey),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -113,6 +124,5 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize =>
-      const Size.fromHeight(kToolbarHeight * 2.2); // Approx ~110–120 pixels
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight * 2.5);
 }

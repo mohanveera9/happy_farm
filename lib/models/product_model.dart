@@ -138,3 +138,103 @@ class Price {
     );
   }
 }
+
+class CategoryModel {
+  final String id;
+  final String name;
+  final String imageUrl;
+  final String color;
+
+  CategoryModel({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+    required this.color,
+  });
+
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    return CategoryModel(
+      id: json['id'],
+      name: json['name'],
+      imageUrl: (json['images'] as List).isNotEmpty ? json['images'][0] : '',
+      color: json['color'] ?? '#ffffff',
+    );
+  }
+}
+
+class FilterProducts {
+  final String id;
+  final String name;
+  final String description;
+  final List<String> images;
+  final List<FilterProductPrice> prices;
+  final String catName;
+  final String? subCatName;
+  final int rating;
+  final bool isFeatured;
+  final DateTime? dateCreated;
+
+  FilterProducts({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.images,
+    required this.prices,
+    required this.catName,
+    this.subCatName,
+    required this.rating,
+    required this.isFeatured,
+    this.dateCreated,
+  });
+
+  factory FilterProducts.fromJson(Map<String, dynamic> json) {
+    return FilterProducts(
+      id: json['_id'],
+      name: json['name'],
+      description: json['description'],
+      images: List<String>.from(json['images'] ?? []),
+      prices: (json['prices'] as List)
+          .map((priceJson) => FilterProductPrice.fromJson(priceJson))
+          .toList(),
+      catName: json['catName'] ?? '',
+      subCatName: (json['subCatName'] == null || json['subCatName'] == '')
+          ? null
+          : json['subCatName'],
+      rating: json['rating'] ?? 0,
+      isFeatured: json['isFeatured'] ?? false,
+      dateCreated: json['dateCreated'] != null
+          ? DateTime.tryParse(json['dateCreated'])
+          : null,
+    );
+  }
+}
+
+class FilterProductPrice {
+  final int quantity;
+  final double actualPrice;
+  final double oldPrice;
+  final int discount;
+  final String type;
+  final int countInStock;
+
+  FilterProductPrice({
+    required this.quantity,
+    required this.actualPrice,
+    required this.oldPrice,
+    required this.discount,
+    required this.type,
+    required this.countInStock,
+  });
+
+  factory FilterProductPrice.fromJson(Map<String, dynamic> json) {
+    return FilterProductPrice(
+      quantity: json['quantity'],
+      actualPrice: (json['actualPrice'] as num).toDouble(),
+      oldPrice: (json['oldPrice'] as num).toDouble(),
+      discount: json['discount'],
+      type: json['type'],
+      countInStock: json['countInStock'],
+    );
+  }
+}
+

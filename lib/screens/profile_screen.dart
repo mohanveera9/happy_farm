@@ -1,22 +1,128 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
+import 'package:happy_farm/screens/change_password.dart';
+import 'package:happy_farm/screens/login_screen.dart';
 import 'package:happy_farm/screens/order_screen.dart';
 import 'package:happy_farm/screens/wishlist_screen.dart';
 import 'package:happy_farm/widgets/app_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBarCustom(title: 'Profile'),
-      body: SingleChildScrollView(
+    return FutureBuilder<String?>(
+      future: getToken(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBarCustom(title: 'Profile'),
+            body: Center(child: CircularProgressIndicator()),
+          );
+        } else if (snapshot.hasError ||
+            !snapshot.hasData ||
+            snapshot.data == null) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBarCustom(title: 'Profile'),
+            body: _Login(),
+          );
+        } else {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBarCustom(title: 'Profile'),
+            body: _Profile(),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _Profile() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildProfileHeader(),
+          const SizedBox(height: 40),
+          _buildOptions(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _Login() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildProfileHeader(),
-            const SizedBox(height: 40),
-            _buildOptions(context),
+            // Add a logo or image at the top (optional)
+            Image.asset(
+              'assets/images/logo.png', // Use your own logo image here
+              width: 120,
+              height: 120,
+            ),
+            const SizedBox(height: 10),
+
+            // Text description
+            Text(
+              'Welcome Back!',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Please login to continue using the app.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+
+            // Login Button with smooth animation and gradient
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                    MaterialPageRoute(builder: (builder) => LoginScreen()));
+              },
+              style: ElevatedButton.styleFrom(
+                // Gradient or solid color
+                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 30),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                'Login',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -110,7 +216,7 @@ class ProfileScreen extends StatelessWidget {
         'subtitle': 'Change password and security settings',
         'function': () {
           Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => ProfileScreen(),
+            builder: (context) => ChangePassword(),
           ));
         }
       },
@@ -190,9 +296,7 @@ class ProfileScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: () {
-        // Handle navigation
-      },
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
@@ -204,48 +308,45 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
         ),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: Colors.black87),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
+              child: Icon(icon, color: Colors.black87),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Colors.grey,
-              ),
-            ],
-          ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey,
+            ),
+          ],
         ),
       ),
     );

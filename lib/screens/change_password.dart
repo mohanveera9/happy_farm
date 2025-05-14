@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:happy_farm/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:happy_farm/screens/signup_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+class ChangePassword extends StatefulWidget {
+  const ChangePassword({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<ChangePassword> createState() => _ChangePasswordState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
+class _ChangePasswordState extends State<ChangePassword> {
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordControler = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -27,9 +27,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final url = Uri.parse(
-        'http://localhost:8000/api/user/signin'); // 🔁 Replace with your backend API
+        'http://localhost:8000/api/user//changePassword/:id'); // 🔁 Replace with your backend API
     final body = {
-      'phone': _phoneController.text.trim(),
+      
       'password': _passwordController.text.trim(),
     };
 
@@ -46,8 +46,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login successful!')),
         );
-        final prefs= await SharedPreferences.getInstance();
-      
+        final prefs = await SharedPreferences.getInstance();
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (builder) => MainScreen(),
@@ -146,24 +146,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 24),
                 const Text(
-                  'Welcome Back',
+                  'Change Password',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Sign in to continue',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
+
                 const SizedBox(height: 40),
 
                 // Enhanced Text Fields with decorative container
                 Column(
                   children: [
                     TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration:
-                          _inputDecoration('Phone Number', Icons.phone_android),
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: _inputDecoration(
+                          'Old Password', Icons.lock_outline,
+                          isPassword: true),
                       style: const TextStyle(fontSize: 16),
                     ),
                     const SizedBox(height: 20),
@@ -171,30 +168,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: _inputDecoration(
-                          'Password', Icons.lock_outline,
+                          'New Password', Icons.lock_outline,
                           isPassword: true),
                       style: const TextStyle(fontSize: 16),
                     ),
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          // Add forgot password functionality
-                        },
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: Color(0xFF00A64F),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: _inputDecoration(
+                          'Confirm Password', Icons.lock_outline,
+                          isPassword: true),
+                      style: const TextStyle(fontSize: 16),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 3),
+                const SizedBox(height: 30),
 
                 if (_errorMessage != null)
                   Container(
@@ -249,40 +239,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           )
                         : const Text(
-                            'Sign In',
+                            'Change Password',
                             style: TextStyle(
                                 fontSize: 17, fontWeight: FontWeight.w600),
                           ),
                   ),
-                ),
-
-                const SizedBox(height: 32),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      "Don't have an account? ",
-                      style: TextStyle(fontSize: 15),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const SignUpScreen()),
-                        );
-                      },
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          color: Color(0xFF00A64F),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

@@ -4,6 +4,7 @@ import 'package:happy_farm/screens/home_screen.dart';
 import 'package:happy_farm/screens/order_screen.dart';
 import 'package:happy_farm/screens/profile_screen.dart';
 import 'package:happy_farm/screens/wishlist_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // import 'screens/home_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -52,6 +53,16 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<void> setToken(String token) async{
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('auth_token', token);
+  }
+
+  @override
+  void initState() {
+    setToken('mohan');
+    super.initState();
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(

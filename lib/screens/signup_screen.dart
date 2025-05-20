@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:happy_farm/utils/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:happy_farm/screens/login_screen.dart';
@@ -25,48 +26,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
+      _errorMessage = null; // Reset error message
     });
 
-    final url = Uri.parse(
-        'https://your-api-url.com/api/register'); // Replace with your endpoint
+    final url = Uri.parse('https://api.sabbafarm.com/api/user/signup');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': _fullNameController.text,
+        'phone': _phoneController.text,
+        'email': _emailController.text,
+        'password': _passwordController.text,
+      }),
+    );
+
+    setState(() => _isLoading = false);
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': _fullNameController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text.trim(),
-        }),
-      );
+      final data = jsonDecode(response.body);
+      print(response.body);
 
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully!')),
+          SnackBar(content: Text(data['message'] ?? 'Account created!')),
         );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
+        Navigator.pop(context); // Or navigate to Login screen
       } else {
-        setState(() {
-          _errorMessage =
-              responseData['message'] ?? 'Registration failed. Try again.';
-        });
+        final errorMsg = data['msg'] ?? 'Something went wrong';
+        setState(() => _errorMessage = errorMsg);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg)),
+        );
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Something went wrong. Check your internet connection.';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _errorMessage = 'Unexpected error occurred.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unexpected error occurred.')),
+      );
     }
   }
 
@@ -75,7 +72,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       labelText: label,
       labelStyle:
           TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500),
-      prefixIcon: Icon(icon, color: const Color(0xFF00A64F)),
+      prefixIcon: Icon(icon, color: AppTheme.primaryColor),
       filled: true,
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -89,7 +86,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF00A64F), width: 2),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
       ),
     );
   }
@@ -185,7 +182,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     height: 55,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A64F),
+                        backgroundColor: AppTheme.primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 2,
                         shape: RoundedRectangleBorder(
@@ -225,7 +222,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         child: const Text(
                           'Sign In',
                           style: TextStyle(
-                            color: Color(0xFF00A64F),
+                            color: AppTheme.primaryColor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

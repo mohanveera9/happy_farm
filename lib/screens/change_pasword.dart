@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/main.dart';
+import 'package:happy_farm/models/user_provider.dart';
+import 'package:happy_farm/utils/app_theme.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,53 +17,68 @@ class ChangePassword extends StatefulWidget {
 class _ChangePasswordState extends State<ChangePassword> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordControler = TextEditingController();
+  final TextEditingController _confirmPasswordControler =
+      TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
 
-  Future<void> _login() async {
+  Future<void> _changePassword(String email) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     final url = Uri.parse(
-        'http://localhost:8000/api/user//changePassword/:id'); // 🔁 Replace with your backend API
+      'https://api.sabbafarm.com/api/user/forgotPassword/changePassword',
+    );
+
     final body = {
-      
-      'password': _passwordController.text.trim(),
+      "email": email,
+      "currentPassword": _passwordController.text.trim(),
+      "newPassword": _newPasswordController.text.trim(),
     };
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        setState(() {
+          _errorMessage = 'Unauthorized. Please log in again.';
+        });
+        return;
+      }
+
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode(body),
       );
 
       final responseData = jsonDecode(response.body);
+      print(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && responseData['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful!')),
+          const SnackBar(content: Text('Password changed successfully!')),
         );
-        final prefs = await SharedPreferences.getInstance();
 
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (builder) => MainScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => MainScreen()),
         );
       } else {
         setState(() {
           _errorMessage =
-              responseData['message'] ?? 'Login failed. Please try again.';
+              responseData['message'] ?? 'Password change failed. Try again.';
         });
       }
     } catch (e) {
-      print(e);
+      print('Error: $e');
       setState(() {
         _errorMessage = 'An error occurred. Check your internet connection.';
       });
@@ -81,7 +99,7 @@ class _ChangePasswordState extends State<ChangePassword> {
       ),
       prefixIcon: Icon(
         prefixIcon,
-        color: const Color(0xFF00A64F),
+        color: AppTheme.primaryColor,
         size: 22,
       ),
       suffixIcon: isPassword
@@ -110,7 +128,7 @@ class _ChangePasswordState extends State<ChangePassword> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF00A64F), width: 2),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -127,6 +145,7 @@ class _ChangePasswordState extends State<ChangePassword> {
 
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<UserProvider>(context, listen: false).user;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -165,7 +184,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                     ),
                     const SizedBox(height: 20),
                     TextField(
-                      controller: _passwordController,
+                      controller: _newPasswordController,
                       obscureText: _obscurePassword,
                       decoration: _inputDecoration(
                           'New Password', Icons.lock_outline,
@@ -174,7 +193,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                     ),
                     const SizedBox(height: 20),
                     TextField(
-                      controller: _passwordController,
+                      controller: _confirmPasswordControler,
                       obscureText: _obscurePassword,
                       decoration: _inputDecoration(
                           'Confirm Password', Icons.lock_outline,
@@ -223,12 +242,41 @@ class _ChangePasswordState extends State<ChangePassword> {
                       backgroundColor: const Color(0xFF00A64F),
                       foregroundColor: Colors.white,
                       elevation: 2,
-                      shadowColor: const Color(0xFF00A64F).withOpacity(0.5),
+                      shadowColor: AppTheme.primaryColor.withOpacity(0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            final current = _passwordController.text.trim();
+                            final newPwd = _newPasswordController.text.trim();
+                            final confirmPwd =
+                                _confirmPasswordControler.text.trim();
+
+                            if (current.isEmpty ||
+                                newPwd.isEmpty ||
+                                confirmPwd.isEmpty) {
+                              setState(() =>
+                                  _errorMessage = 'All fields are required.');
+                              return;
+                            }
+
+                            if (newPwd != confirmPwd) {
+                              setState(() =>
+                                  _errorMessage = 'Passwords do not match.');
+                              return;
+                            }
+
+                            if (current == newPwd) {
+                              setState(() => _errorMessage =
+                                  'New password must be different.');
+                              return;
+                            }
+
+                            _changePassword(user.email ?? 'Unknown');
+                          },
                     child: _isLoading
                         ? const SizedBox(
                             height: 24,

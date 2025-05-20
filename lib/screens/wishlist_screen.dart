@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:happy_farm/models/product_model.dart';
+import 'package:happy_farm/screens/productdetails_screen.dart';
+import 'package:happy_farm/widgets/wishListShimmer.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -7,38 +13,115 @@ class WishlistScreen extends StatefulWidget {
   State<WishlistScreen> createState() => _WishlistScreenState();
 }
 
-class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProviderStateMixin {
+class _WishlistScreenState extends State<WishlistScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  final List<Map<String, dynamic>> wishlist = [
-    {
-      'title': 'Organic Apples',
-      'price': 19.99,
-      'image': 'assets/images/apple.png',
-      'rating': 4.8,
-      'isFavorite': true,
-    },
-    {
-      'title': 'Fresh Strawberries',
-      'price': 24.99,
-      'image': 'assets/images/strawberry.png',
-      'rating': 4.5,
-      'isFavorite': true,
-    },
-    {
-      'title': 'Organic Blueberries',
-      'price': 29.99,
-      'image': 'assets/images/blueberry.png',
-      'rating': 4.7,
-      'isFavorite': true,
-    },
-    {
-      'title': 'Fresh Oranges',
-      'price': 15.99,
-      'image': 'assets/images/orange.png',
-      'rating': 4.6,
-      'isFavorite': true,
-    },
-  ];
+  List<Map<String, dynamic>> wishlist = [];
+  late Future<void> wishlistFuture;
+
+  void removeFrommylist(int index) async {
+    final item = wishlist[index];
+    final wishlistItemId =
+        item['_id']; // assuming _id is the unique wishlist item ID
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('token');
+
+    final url =
+        Uri.parse('https://api.sabbafarm.com/api/my-list/$wishlistItemId');
+
+    final response = await http.delete(
+      url,
+      headers: {
+        'Authorization': '$token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        wishlist.removeAt(index);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Item removed from wishlist')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove item')),
+      );
+    }
+  }
+
+  Future<void> addToCart({
+    required String productId,
+    required String priceId,
+    required int quantity,
+    required BuildContext context,
+  }) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    final token = prefs.getString('token');
+
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User not logged in")),
+      );
+      return;
+    }
+
+    final body = {
+      "productId": productId,
+      "priceId": priceId,
+      "userId": userId,
+      "quantity": quantity
+    };
+
+    final response = await http.post(
+      Uri.parse("https://api.sabbafarm.com/api/cart/add"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token ?? "", // fallback if token is null
+      },
+      body: json.encode(body),
+    );
+
+    if (response.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Added to cart!")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to add: ${response.body}")),
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchWishlist() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? userId = prefs.getString('userId');
+    final String? token = prefs.getString('token');
+    final url =
+        Uri.parse('https://api.sabbafarm.com/api/my-list?userId=$userId');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    final result = json.decode(response.body);
+    print(result);
+    if (response.statusCode == 200) {
+      if (result['success'] == true && result['data'] != null) {
+        return List<Map<String, dynamic>>.from(result['data']);
+      } else {
+        throw Exception(result['message'] ?? 'No data found');
+      }
+    } else {
+      throw Exception(result['message'] ?? 'Failed to load wishlist');
+    }
+  }
 
   @override
   void initState() {
@@ -47,6 +130,14 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    wishlistFuture = loadWishlist();
+  }
+
+  Future<void> loadWishlist() async {
+    final data = await fetchWishlist();
+    setState(() {
+      wishlist = data;
+    });
   }
 
   @override
@@ -55,26 +146,17 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  void removeFromWishlist(int index) {
-    setState(() {
-      wishlist.removeAt(index);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         elevation: 0,
         title: const Text(
           'My Wishlist',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
         ),
-        backgroundColor: Colors.green[800],
+        backgroundColor: Colors.green.shade700,
+        automaticallyImplyLeading: false,
         actions: [
           Center(
             child: Container(
@@ -95,271 +177,226 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
           ),
         ],
       ),
-      body: wishlist.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite_border,
-                    size: 100,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Your wishlist is empty',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Items you like will appear here',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Navigate to products screen
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[800],
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(Icons.shopping_bag_outlined),
-                    label: const Text(
-                      'Explore Products',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: wishlist.length,
-              itemBuilder: (context, index) {
-                final item = wishlist[index];
-                // Create staggered animation
-                final Animation<double> animation = Tween<double>(
-                  begin: 0.0,
-                  end: 1.0,
-                ).animate(
-                  CurvedAnimation(
-                    parent: _controller,
-                    curve: Interval(
-                      (1 / wishlist.length) * index,
-                      1.0,
-                      curve: Curves.fastOutSlowIn,
-                    ),
-                  ),
-                );
-                _controller.forward();
-                
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.5, 0),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: Dismissible(
-                      key: UniqueKey(),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.red[400],
-                          borderRadius: BorderRadius.circular(16),
+      body: FutureBuilder<void>(
+        future: wishlistFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: WishlistShimmer());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else {
+            return wishlist.isEmpty
+                ? const Center(child: Text('Your wishlist is empty'))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: wishlist.length,
+                    itemBuilder: (context, index) {
+                      final item = wishlist[index];
+                      final product = item['productId'];
+                      final productId = product['_id']; // ✅ productId as string
+                      final title = product['name'];
+                      final rating = product['rating'];
+
+                      // Extract image
+                      final image = (product['images'] != null &&
+                              product['images'].isNotEmpty)
+                          ? product['images'][0]
+                          : null;
+
+                      // Extract price details
+                      final prices = product['prices'];
+                      final priceObj = (prices != null && prices.isNotEmpty)
+                          ? prices[0]
+                          : null;
+
+                      final priceValue =
+                          priceObj != null ? priceObj['actualPrice'] : null;
+                      final priceId = priceObj != null ? priceObj['_id'] : null;
+                      final quantity =
+                          priceObj != null ? priceObj['quantity'] : null;
+
+                      final animation = Tween<double>(begin: 0.0, end: 1.0)
+                          .animate(CurvedAnimation(
+                        parent: _controller,
+                        curve: Interval(
+                          (1 / wishlist.length) * index,
+                          1.0,
+                          curve: Curves.fastOutSlowIn,
                         ),
-                        child: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      onDismissed: (direction) {
-                        removeFromWishlist(index);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${item['title']} removed from wishlist'),
-                            action: SnackBarAction(
-                              label: 'UNDO',
-                              onPressed: () {
-                                setState(() {
-                                  wishlist.insert(index, item);
-                                });
+                      ));
+                      _controller.forward();
+
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.5, 0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: Dismissible(
+                            key: UniqueKey(),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.red[400],
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(Icons.delete_outline,
+                                  color: Colors.white),
+                            ),
+                            onDismissed: (direction) {
+                              final removedItem = wishlist[index];
+                              removeFrommylist(index);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('$title removed from wishlist'),
+                                  action: SnackBarAction(
+                                    label: 'UNDO',
+                                    onPressed: () {
+                                      setState(() {
+                                        wishlist.insert(index, removedItem);
+                                      });
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            child: GestureDetector(
+                              onTap: () {
+                                final productInstance =
+                                    AllProduct.fromJson(product);
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (builder) => ProductDetails(
+                                      product: productInstance,
+                                    ),
+                                  ),
+                                );
                               },
+                              child: Card(
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                        color: Colors.grey.shade300)),
+                                margin: const EdgeInsets.only(bottom: 16),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 100,
+                                            height: 100,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              color: Colors.green[50],
+                                              image: image != null
+                                                  ? DecorationImage(
+                                                      image:
+                                                          NetworkImage(image),
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        title,
+                                                        style: const TextStyle(
+                                                          fontSize: 18,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                    InkWell(
+                                                      onTap: () =>
+                                                          removeFrommylist(
+                                                              index),
+                                                      child: Icon(
+                                                          Icons.favorite,
+                                                          color:
+                                                              Colors.red[400]),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  '\$$priceValue',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.green[800],
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    ...List.generate(
+                                                      5,
+                                                      (i) => Icon(
+                                                        i < rating.floor()
+                                                            ? Icons.star
+                                                            : i < rating
+                                                                ? Icons
+                                                                    .star_half
+                                                                : Icons
+                                                                    .star_border,
+                                                        color: Colors.amber,
+                                                        size: 16,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '$rating',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 12),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        );
-                      },
-                      child: Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
                         ),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              // Product image
-                              Hero(
-                                tag: 'wishlist_${item['title']}',
-                                child: Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    color: Colors.green[50],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.eco_outlined,
-                                      color: Colors.green[800],
-                                      size: 40,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              // Product details
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            item['title'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        InkWell(
-                                          onTap: () {
-                                            removeFromWishlist(index);
-                                          },
-                                          child: Icon(
-                                            Icons.favorite,
-                                            color: Colors.red[400],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '\$${item['price']}',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.green[800],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    // Rating
-                                    Row(
-                                      children: [
-                                        ...List.generate(
-                                          5,
-                                          (i) => Icon(
-                                            i < (item['rating'] as double).floor()
-                                                ? Icons.star
-                                                : i < (item['rating'] as double)
-                                                    ? Icons.star_half
-                                                    : Icons.star_border,
-                                            color: Colors.amber,
-                                            size: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${item['rating']}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    // Action buttons
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: OutlinedButton(
-                                            onPressed: () {
-                                              // View details
-                                            },
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: Colors.green[800],
-                                              side: BorderSide(color: Colors.green[800]!),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              padding: const EdgeInsets.symmetric(vertical: 8),
-                                            ),
-                                            child: const Text('View Details'),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              // Add to cart
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('${item['title']} added to cart'),
-                                                ),
-                                              );
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.green[800],
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              padding: const EdgeInsets.symmetric(vertical: 8),
-                                            ),
-                                            child: const Text('Add to Cart'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+                      );
+                    },
+                  );
+          }
+        },
+      ),
       floatingActionButton: wishlist.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () {
-                // Add all to cart
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('All items added to cart'),

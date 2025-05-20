@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/main.dart';
+import 'package:happy_farm/models/user_provider.dart';
+import 'package:happy_farm/utils/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:happy_farm/screens/signup_screen.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,8 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    final url = Uri.parse(
-        'http://localhost:8000/api/user/signin'); // 🔁 Replace with your backend API
+    final url = Uri.parse('https://api.sabbafarm.com/api/user/signin');
     final body = {
       'phone': _phoneController.text.trim(),
       'password': _passwordController.text.trim(),
@@ -41,16 +43,27 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final responseData = jsonDecode(response.body);
+      print(responseData);
 
       if (response.statusCode == 200) {
+        // Store token and userId in SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', responseData['token']);
+        await prefs.setString('userId', responseData['user']['_id']);
+
+        Provider.of<UserProvider>(context, listen: false).setUser(
+          username: responseData['user']['name'],
+          email: responseData['user']['email'],
+          phoneNumber: responseData['user']['phone'] ,
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login successful!')),
         );
-        final prefs= await SharedPreferences.getInstance();
-      
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (builder) => MainScreen(),
+            builder: (builder) => const MainScreen(),
           ),
         );
       } else {
@@ -59,10 +72,11 @@ class _LoginScreenState extends State<LoginScreen> {
               responseData['message'] ?? 'Login failed. Please try again.';
         });
       }
-    } catch (e) {
-      print(e);
+    } catch (e, stackTrace) {
+      print('OSError: $e');
+      print('StackTrace: $stackTrace');
       setState(() {
-        _errorMessage = 'An error occurred. Check your internet connection.';
+        _errorMessage = 'Error: $e';
       });
     } finally {
       setState(() {
@@ -81,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       prefixIcon: Icon(
         prefixIcon,
-        color: const Color(0xFF00A64F),
+        color: AppTheme.primaryColor,
         size: 22,
       ),
       suffixIcon: isPassword
@@ -110,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF00A64F), width: 2),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -185,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text(
                           'Forgot Password?',
                           style: TextStyle(
-                            color: Color(0xFF00A64F),
+                            color: AppTheme.primaryColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -230,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 55,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00A64F),
+                      backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
                       elevation: 2,
                       shadowColor: const Color(0xFF00A64F).withOpacity(0.5),
@@ -251,7 +265,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text(
                             'Sign In',
                             style: TextStyle(
-                                fontSize: 17, fontWeight: FontWeight.w600),
+                                fontSize: 17, fontWeight: FontWeight.w600,),
                           ),
                   ),
                 ),
@@ -276,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         'Sign Up',
                         style: TextStyle(
-                          color: Color(0xFF00A64F),
+                          color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),

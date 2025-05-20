@@ -1,15 +1,29 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:happy_farm/screens/cart_screen.dart';
-import 'package:happy_farm/screens/home_screen.dart';
+import 'package:happy_farm/models/user_provider.dart';
+import 'package:happy_farm/screens/login_prompt_screen.dart';
 import 'package:happy_farm/screens/order_screen.dart';
 import 'package:happy_farm/screens/profile_screen.dart';
 import 'package:happy_farm/screens/wishlist_screen.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'screens/home_screen.dart';
+import 'package:happy_farm/screens/cart_screen.dart';
+import 'package:happy_farm/screens/home_screen.dart';
 import 'utils/app_theme.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
-  runApp(const MyApp());
+  HttpOverrides.global = MyHttpOverrides();
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -22,11 +36,16 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainScreen(),
-      routes: {
-        '/orders': (context) => const OrdersScreen(),
-        '/wishlist': (context) => const WishlistScreen(),
-      },
     );
+  }
+}
+
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
   }
 }
 
@@ -39,13 +58,58 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  String? _userId;
+  bool _isCheckingLogin = true;
+  bool _isLoggedIn = false;
 
-  static final List<Widget> _screens = [
-    HomeScreen(),
-    const Center(child: Text('Category')),
-    CartScreen(),
-    ProfileScreen()
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+    getUser();
+  }
+
+  Future<void> getUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String? userId = prefs.getString('userId');
+    if (userId != null && token != null) {
+      final url = Uri.parse('https://api.sabbafarm.com/api/user/$userId');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': '$token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print(data['name']);
+
+        Provider.of<UserProvider>(context, listen: false).setUser(
+          username: data['name'],
+          email: data['email'],
+          phoneNumber: data['phone'],
+        );
+      } else {
+        print('Failed to load profile: ${response.statusCode}');
+      }
+    }
+  }
+
+  Future<void> _checkLoginStatus() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String? userId = prefs.getString('userId');
+
+    setState(() {
+      _isLoggedIn = token != null && userId != null;
+      _userId = userId;
+      _selectedIndex = 0; // Always default to Home
+      _isCheckingLogin = false;
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -53,59 +117,97 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  Future<void> setToken(String token) async{
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('auth_token', token);
-  }
-
-  @override
-  void initState() {
-    setToken('mohan');
-    super.initState();
-  }
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingLogin) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    String _getTitleForIndex(int index) {
+      switch (index) {
+        case 0:
+          return 'Home';
+        case 1:
+          return 'Orders';
+        case 2:
+          return 'Wishlist';
+        case 3:
+          return 'Cart';
+        case 4:
+          return 'Account';
+        default:
+          return 'Sabba Farm';
+      }
+    }
+
+    Widget _getScreen(int index) {
+      if (!_isLoggedIn && index != 0) {
+        return LoginPromptScreen(title: _getTitleForIndex(index),);
+      }
+
+      switch (index) {
+        case 0:
+          return const HomeScreen();
+        case 1:
+          return const OrdersScreen();
+        case 2:
+          return const WishlistScreen();
+        case 3:
+          return CartScreen(userId: _userId ?? '');
+        case 4:
+          return const ProfileScreen();
+        default:
+          return const HomeScreen();
+      }
+    }
+
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: _getScreen(_selectedIndex),
       bottomNavigationBar: Container(
-        padding: EdgeInsets.only(top: 5, bottom: 5),
-        decoration: BoxDecoration(
-          color: Colors.white,
+        decoration: const BoxDecoration(
+          color: Color.fromARGB(255, 56, 142, 60),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black26,
-              blurRadius: 12,
+              color: Colors.black12,
+              blurRadius: 8,
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.only(
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            selectedItemColor: AppTheme.primaryColor,
-            unselectedItemColor: Colors.grey,
-            selectedFontSize: 14,
+            backgroundColor: AppTheme.primaryColor,
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.white70,
+            selectedFontSize: 12,
             unselectedFontSize: 12,
             currentIndex: _selectedIndex,
             onTap: _onItemTapped,
-            items: [
+            items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),
                 activeIcon: Icon(Icons.home),
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.category_outlined),
-                activeIcon: Icon(Icons.category),
-                label: 'Categories',
+                icon: Icon(Icons.inventory_2_outlined),
+                activeIcon: Icon(Icons.inventory_2),
+                label: 'Orders',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.favorite_border),
+                activeIcon: Icon(Icons.favorite),
+                label: 'Wishlist',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.shopping_cart_outlined),

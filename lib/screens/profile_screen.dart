@@ -1,12 +1,15 @@
-import 'dart:ffi';
-
 import 'package:flutter/material.dart';
-import 'package:happy_farm/screens/change_password.dart';
-import 'package:happy_farm/screens/login_screen.dart';
+import 'package:happy_farm/main.dart';
+import 'package:happy_farm/models/user_provider.dart';
+import 'package:happy_farm/screens/change_pasword.dart';
 import 'package:happy_farm/screens/order_screen.dart';
 import 'package:happy_farm/screens/wishlist_screen.dart';
-import 'package:happy_farm/widgets/app_bar.dart';
+import 'package:happy_farm/utils/app_theme.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:happy_farm/screens/personal_info.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,125 +19,38 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
-  }
+  String profileImage = '';
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: getToken(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBarCustom(title: 'Profile'),
-            body: Center(child: CircularProgressIndicator()),
-          );
-        } else if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data == null) {
-          return Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBarCustom(title: 'Profile'),
-            body: _Login(),
-          );
-        } else {
-          return Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBarCustom(title: 'Profile'),
-            body: _Profile(),
-          );
-        }
-      },
-    );
-  }
-
-  Widget _Profile() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildProfileHeader(),
-          const SizedBox(height: 40),
-          _buildOptions(context),
-        ],
+    final user = Provider.of<UserProvider>(context, listen: false).user;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: const Center(child: Text("My Profile")),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
       ),
-    );
-  }
-
-  Widget _Login() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+      body: SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Add a logo or image at the top (optional)
-            Image.asset(
-              'assets/images/logo.png', // Use your own logo image here
-              width: 120,
-              height: 120,
-            ),
-            const SizedBox(height: 10),
-
-            // Text description
-            Text(
-              'Welcome Back!',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Please login to continue using the app.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w400,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-
-            // Login Button with smooth animation and gradient
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                    MaterialPageRoute(builder: (builder) => LoginScreen()));
-              },
-              style: ElevatedButton.styleFrom(
-                // Gradient or solid color
-                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 30),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                'Login',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+            _buildProfileHeader(
+                user.username ?? 'Unkown', user.email ?? 'Unkown'),
+            const SizedBox(height: 40),
+            _buildOptions(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(String name, String email) {
     return Container(
       padding: const EdgeInsets.only(top: 30, left: 20, right: 20),
       child: Row(
         children: [
-          // Profile Image with edit button
           Stack(
             alignment: Alignment.bottomRight,
             children: [
@@ -142,23 +58,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 2,
-                      blurRadius: 8,
-                    ),
-                  ],
                 ),
                 child: const CircleAvatar(
                   radius: 40,
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/10'),
+                  backgroundImage: AssetImage('assets/images/profile.png'),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Colors.black,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -169,26 +78,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          SizedBox(
-            width: 20,
-          ),
+          const SizedBox(width: 20),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Veera Mohan',
+                name,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'veeramohan@email.com',
+                email,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w400,
+                  color: Colors.black,
                 ),
               ),
             ],
@@ -204,10 +111,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'icon': Icons.person_outlined,
         'title': 'Personal Information',
         'subtitle': 'Manage your personal details',
-        'function': () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => ProfileScreen(),
-          ));
+        'function': () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const PersonalInfoScreen()),
+          );
+          setState(() {}); // Rebuild UI after coming back
         }
       },
       {
@@ -215,49 +123,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'title': 'Security',
         'subtitle': 'Change password and security settings',
         'function': () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => ChangePassword(),
-          ));
-        }
-      },
-      {
-        'icon': Icons.shopping_bag_outlined,
-        'title': 'My Orders',
-        'subtitle': 'View recent orders and track shipping',
-        'function': () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => OrdersScreen(),
-          ));
-        }
-      },
-      {
-        'icon': Icons.favorite_border,
-        'title': 'Wishlist',
-        'subtitle': 'Items you\'ve saved for later',
-        'function': () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => WishlistScreen(),
-          ));
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (builder) => ChangePassword(),
+            ),
+          );
         }
       },
       {
         'icon': Icons.help_outline,
         'title': 'Help & Support',
         'subtitle': 'Get assistance and answers',
-        'function': () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => ProfileScreen(),
-          ));
-        }
+        'function': () {}
       },
       {
         'icon': Icons.logout,
         'title': 'Logout',
         'subtitle': 'Sign out of your account',
-        'function': () {
-          // Implement logout logic
+        'function': () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.clear();
+
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (route) => false,
+          );
         }
-      },
+      }
     ];
 
     return Container(
@@ -265,17 +157,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 8, bottom: 12),
-            child: Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
+          Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
           ),
+          const SizedBox(height: 12),
           ...options.map((option) => _buildOptionTile(
                 context,
                 icon: option['icon'] as IconData,
@@ -301,22 +191,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.grey[200]!,
-              width: 1,
-            ),
-          ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
+        margin: const EdgeInsets.only(bottom: 12),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Colors.green.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: Colors.black87),
+              child: Icon(icon, color: Colors.black),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -325,9 +212,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -335,7 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: Colors.green.shade800,
                     ),
                   ),
                 ],

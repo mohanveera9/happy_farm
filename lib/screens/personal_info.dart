@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/user_model.dart';
 import 'package:happy_farm/models/user_provider.dart';
-import 'package:http/http.dart' as http;
+import 'package:happy_farm/service/user_service.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
@@ -27,54 +25,40 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Future<void> updatePersonalInfo() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+  setState(() {
+    _isLoading = true;
+  });
 
-    final prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString('userId');
-    String? token = prefs.getString('token');
+  final authService = UserService();
+  final result = await authService.updatePersonalInfo(
+    name: _nameController.text,
+    email: _emailController.text,
+    phone: _phoneController.text,
+  );
 
-    final url = Uri.parse('https://api.sabbafarm.com/api/user/$userId');
-    final body = {
-      "name": _nameController.text.trim(),
-      "email": _emailController.text.trim(),
-      "phone": _phoneController.text.trim(),
-    };
+  setState(() {
+    _isLoading = false;
+  });
 
-    final response = await http.put(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
+  if (result.containsKey('error')) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result['error'])),
     );
-
-    setState(() {
-      _isLoading = false;
-    });
-    print(response.body);
-    if (response.statusCode == 200) {
-      final responseData  = jsonDecode(response.body);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Details updated successfully!')),
-      );
-      Provider.of<UserProvider>(context, listen: false).updateUserDetails(
-        UserModel(
-          username: responseData['name'],
-          email: responseData['email'],
-          phoneNumber: responseData['phone'],
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update details.')),
-      );
-    }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Details updated successfully!')),
+    );
+    Provider.of<UserProvider>(context, listen: false).updateUserDetails(
+      UserModel(
+        username: result['name'],
+        email: result['email'],
+        phoneNumber: result['phone'],
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

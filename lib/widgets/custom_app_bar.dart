@@ -45,7 +45,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               // Logo
               ClipOval(
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/sb.png',
                   height: 40,
                   width: 40,
                   fit: BoxFit.cover,
@@ -53,17 +53,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
 
               // Title
-              Row(
-                children: const [
-                  Text(
-                    'SabbaFarm',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              const Text(
+                'SabbaFarm',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
 
               // Notifications
@@ -97,7 +93,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: Colors.grey),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
@@ -111,7 +106,25 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                           ),
                         ),
                       ),
-                      const Icon(Icons.mic_none, color: Colors.grey),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: searchController,
+                        builder: (context, value, child) {
+                          return IconButton(
+                            icon: Icon(
+                              value.text.isEmpty
+                                  ? Icons.search
+                                  : Icons.clear,
+                              color: Colors.grey,
+                            ),
+                            onPressed: value.text.isEmpty
+                                ? null
+                                : () {
+                                    searchController.clear();
+                                    onSearchChanged('');
+                                  },
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),

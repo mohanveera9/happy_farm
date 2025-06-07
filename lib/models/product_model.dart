@@ -9,6 +9,8 @@ abstract class BaseProduct {
   final String? subCatName;
   final int rating;
   final bool isFeatured;
+  final bool isAddedToCart;
+  final bool isAddedToWishlist;
 
   BaseProduct({
     required this.id,
@@ -20,6 +22,8 @@ abstract class BaseProduct {
     this.subCatName,
     required this.rating,
     required this.isFeatured,
+    required this.isAddedToCart,
+    required this.isAddedToWishlist,
   });
 
   Map<String, dynamic> toJson() => {
@@ -95,17 +99,20 @@ class FeaturedProduct extends BaseProduct {
     required int rating,
     required bool isFeatured,
     required this.dateCreated,
+    required isAddedToWishlist,
+    required isAddedToCart,
   }) : super(
-          id: id,
-          name: name,
-          description: description,
-          images: images,
-          prices: prices,
-          catName: category,
-          subCatName: subCategory,
-          rating: rating,
-          isFeatured: isFeatured,
-        );
+            id: id,
+            name: name,
+            description: description,
+            images: images,
+            prices: prices,
+            catName: category,
+            subCatName: subCategory,
+            rating: rating,
+            isFeatured: isFeatured,
+            isAddedToCart: isAddedToCart,
+            isAddedToWishlist: isAddedToWishlist);
 
   factory FeaturedProduct.fromJson(Map<String, dynamic> json) {
     return FeaturedProduct(
@@ -113,13 +120,14 @@ class FeaturedProduct extends BaseProduct {
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       images: List<String>.from(json['images'] ?? []),
-      prices: (json['prices'] as List)
-          .map((e) => PriceModel.fromJson(e))
-          .toList(),
+      prices:
+          (json['prices'] as List).map((e) => PriceModel.fromJson(e)).toList(),
       category: json['catName'] ?? '',
       subCategory: json['subCatName'] ?? '',
       rating: json['rating'] ?? 0,
       isFeatured: json['isFeatured'] ?? false,
+      isAddedToWishlist: json['isAddedToWishlist'] ?? false,
+      isAddedToCart: json['isAddedToCart'] ?? false,
       dateCreated:
           DateTime.tryParse(json['dateCreated'] ?? '') ?? DateTime.now(),
     );
@@ -145,6 +153,8 @@ class AllProduct extends BaseProduct {
     this.subCat,
     required int rating,
     required bool isFeatured,
+    required isAddedToWishlist,
+    required isAddedToCart,
   }) : super(
           id: id,
           name: name,
@@ -155,6 +165,8 @@ class AllProduct extends BaseProduct {
           subCatName: subCatName,
           rating: rating,
           isFeatured: isFeatured,
+          isAddedToCart: isAddedToCart,
+          isAddedToWishlist: isAddedToWishlist
         );
 
   factory AllProduct.fromJson(Map<String, dynamic> json) {
@@ -167,9 +179,8 @@ class AllProduct extends BaseProduct {
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       images: List<String>.from(json['images'] ?? []),
-      prices: (json['prices'] as List)
-          .map((e) => PriceModel.fromJson(e))
-          .toList(),
+      prices:
+          (json['prices'] as List).map((e) => PriceModel.fromJson(e)).toList(),
       catName: (json['catName'] ?? '').trim(),
       catId: json['catId'] ?? '',
       subCatName: subCatName,
@@ -177,6 +188,8 @@ class AllProduct extends BaseProduct {
       subCat: json['subCat'],
       rating: json['rating'] ?? 0,
       isFeatured: json['isFeatured'] ?? false,
+      isAddedToWishlist: json['isAddedToWishlist'] ?? false,
+      isAddedToCart: json['isAddedToCart'] ?? false,
     );
   }
 }
@@ -195,7 +208,7 @@ class FilterProducts extends BaseProduct {
     String? subCatName,
     required int rating,
     required bool isFeatured,
-    this.dateCreated,
+    this.dateCreated, required isAddedToWishlist, required isAddedToCart,
   }) : super(
           id: id,
           name: name,
@@ -206,6 +219,8 @@ class FilterProducts extends BaseProduct {
           subCatName: subCatName,
           rating: rating,
           isFeatured: isFeatured,
+          isAddedToCart: isAddedToCart,
+          isAddedToWishlist: isAddedToWishlist
         );
 
   factory FilterProducts.fromJson(Map<String, dynamic> json) {
@@ -218,13 +233,14 @@ class FilterProducts extends BaseProduct {
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       images: List<String>.from(json['images'] ?? []),
-      prices: (json['prices'] as List)
-          .map((e) => PriceModel.fromJson(e))
-          .toList(),
+      prices:
+          (json['prices'] as List).map((e) => PriceModel.fromJson(e)).toList(),
       catName: json['catName'] ?? '',
       subCatName: subCatName,
       rating: json['rating'] ?? 0,
       isFeatured: json['isFeatured'] ?? false,
+      isAddedToWishlist: json['isAddedToWishlist'] ?? false,
+      isAddedToCart: json['isAddedToCart'] ?? false,
       dateCreated: json['dateCreated'] != null
           ? DateTime.tryParse(json['dateCreated'])
           : null,

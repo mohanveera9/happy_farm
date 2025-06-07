@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/product_model.dart';
 import 'package:happy_farm/screens/productdetails_screen.dart';
+import 'package:happy_farm/service/cart_service.dart' show CartService;
 import 'package:happy_farm/widgets/wishListShimmer.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:happy_farm/service/Whislist_service.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -19,124 +18,21 @@ class _WishlistScreenState extends State<WishlistScreen>
   List<Map<String, dynamic>> wishlist = [];
   late Future<void> wishlistFuture;
 
-  void removeFrommylist(int index) async {
-    final item = wishlist[index];
-    final wishlistItemId =
-        item['_id']; // assuming _id is the unique wishlist item ID
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('token');
-
-    final url =
-        Uri.parse('https://api.sabbafarm.com/api/my-list/$wishlistItemId');
-
-    final response = await http.delete(
-      url,
-      headers: {
-        'Authorization': '$token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        wishlist.removeAt(index);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Item removed from wishlist')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to remove item')),
-      );
-    }
-  }
-
-  Future<void> addToCart({
-    required String productId,
-    required String priceId,
-    required int quantity,
-    required BuildContext context,
-  }) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString('token');
-
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not logged in")),
-      );
-      return;
-    }
-
-    final body = {
-      "productId": productId,
-      "priceId": priceId,
-      "userId": userId,
-      "quantity": quantity
-    };
-
-    final response = await http.post(
-      Uri.parse("https://api.sabbafarm.com/api/cart/add"),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": token ?? "", // fallback if token is null
-      },
-      body: json.encode(body),
-    );
-
-    if (response.statusCode == 201) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Added to cart!")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to add: ${response.body}")),
-      );
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> fetchWishlist() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? userId = prefs.getString('userId');
-    final String? token = prefs.getString('token');
-    final url =
-        Uri.parse('https://api.sabbafarm.com/api/my-list?userId=$userId');
-
-    final response = await http.get(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    final result = json.decode(response.body);
-    print(result);
-    if (response.statusCode == 200) {
-      if (result['success'] == true && result['data'] != null) {
-        return List<Map<String, dynamic>>.from(result['data']);
-      } else {
-        throw Exception(result['message'] ?? 'No data found');
-      }
-    } else {
-      throw Exception(result['message'] ?? 'Failed to load wishlist');
-    }
-  }
-
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 500),
     );
     wishlistFuture = loadWishlist();
   }
 
   Future<void> loadWishlist() async {
-    final data = await fetchWishlist();
+    final data = await WishlistService.fetchWishlist();
     setState(() {
       wishlist = data;
+      _controller.forward(); // Animate once after data loads
     });
   }
 
@@ -152,9 +48,7 @@ class _WishlistScreenState extends State<WishlistScreen>
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         elevation: 0,
-        title: const Text(
-          'My Wishlist',
-        ),
+        title: const Text('My Wishlist'),
         backgroundColor: Colors.green.shade700,
         automaticallyImplyLeading: false,
         actions: [
@@ -193,17 +87,15 @@ class _WishlistScreenState extends State<WishlistScreen>
                     itemBuilder: (context, index) {
                       final item = wishlist[index];
                       final product = item['productId'];
-                      final productId = product['_id']; // ✅ productId as string
+                      final wishlistId = item['_id']; // <-- used to remove
+
                       final title = product['name'];
                       final rating = product['rating'];
-
-                      // Extract image
                       final image = (product['images'] != null &&
                               product['images'].isNotEmpty)
                           ? product['images'][0]
                           : null;
 
-                      // Extract price details
                       final prices = product['prices'];
                       final priceObj = (prices != null && prices.isNotEmpty)
                           ? prices[0]
@@ -211,9 +103,6 @@ class _WishlistScreenState extends State<WishlistScreen>
 
                       final priceValue =
                           priceObj != null ? priceObj['actualPrice'] : null;
-                      final priceId = priceObj != null ? priceObj['_id'] : null;
-                      final quantity =
-                          priceObj != null ? priceObj['quantity'] : null;
 
                       final animation = Tween<double>(begin: 0.0, end: 1.0)
                           .animate(CurvedAnimation(
@@ -224,7 +113,6 @@ class _WishlistScreenState extends State<WishlistScreen>
                           curve: Curves.fastOutSlowIn,
                         ),
                       ));
-                      _controller.forward();
 
                       return FadeTransition(
                         opacity: animation,
@@ -234,7 +122,7 @@ class _WishlistScreenState extends State<WishlistScreen>
                             end: Offset.zero,
                           ).animate(animation),
                           child: Dismissible(
-                            key: UniqueKey(),
+                            key: ValueKey(wishlistId),
                             direction: DismissDirection.endToStart,
                             background: Container(
                               alignment: Alignment.centerRight,
@@ -247,9 +135,15 @@ class _WishlistScreenState extends State<WishlistScreen>
                               child: const Icon(Icons.delete_outline,
                                   color: Colors.white),
                             ),
-                            onDismissed: (direction) {
+                            onDismissed: (direction) async {
                               final removedItem = wishlist[index];
-                              removeFrommylist(index);
+                              setState(() {
+                                wishlist.removeAt(index);
+                              });
+
+                              await WishlistService.removeFromWishlist(
+                                  wishlistId);
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('$title removed from wishlist'),
@@ -279,107 +173,102 @@ class _WishlistScreenState extends State<WishlistScreen>
                               child: Card(
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: BorderSide(
-                                        color: Colors.grey.shade300)),
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                ),
                                 margin: const EdgeInsets.only(bottom: 16),
                                 child: Padding(
                                   padding: const EdgeInsets.all(12),
-                                  child: Column(
+                                  child: Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            width: 100,
-                                            height: 100,
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              color: Colors.green[50],
-                                              image: image != null
-                                                  ? DecorationImage(
-                                                      image:
-                                                          NetworkImage(image),
-                                                      fit: BoxFit.cover,
-                                                    )
-                                                  : null,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 16),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                      Container(
+                                        width: 100,
+                                        height: 100,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          color: Colors.green[50],
+                                          image: image != null
+                                              ? DecorationImage(
+                                                  image: NetworkImage(image),
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
                                               children: [
-                                                Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        title,
-                                                        style: const TextStyle(
-                                                          fontSize: 18,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
+                                                Expanded(
+                                                  child: Text(
+                                                    title,
+                                                    style: const TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                     ),
-                                                    InkWell(
-                                                      onTap: () =>
-                                                          removeFrommylist(
-                                                              index),
-                                                      child: Icon(
-                                                          Icons.favorite,
-                                                          color:
-                                                              Colors.red[400]),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  '\$$priceValue',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.green[800],
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 8),
-                                                Row(
-                                                  children: [
-                                                    ...List.generate(
-                                                      5,
-                                                      (i) => Icon(
-                                                        i < rating.floor()
-                                                            ? Icons.star
-                                                            : i < rating
-                                                                ? Icons
-                                                                    .star_half
-                                                                : Icons
-                                                                    .star_border,
-                                                        color: Colors.amber,
-                                                        size: 16,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      '$rating',
-                                                      style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                  ],
+                                                InkWell(
+                                                  onTap: () async {
+                                                    await WishlistService
+                                                        .removeFromWishlist(
+                                                            wishlistId);
+                                                    setState(() {
+                                                      wishlist.removeAt(index);
+                                                    });
+                                                  },
+                                                  child: Icon(Icons.favorite,
+                                                      color: Colors.red[400]),
                                                 ),
-                                                const SizedBox(height: 12),
                                               ],
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              '\$$priceValue',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.green[800],
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                ...List.generate(
+                                                  5,
+                                                  (i) => Icon(
+                                                    i < rating.floor()
+                                                        ? Icons.star
+                                                        : i < rating
+                                                            ? Icons.star_half
+                                                            : Icons.star_border,
+                                                    color: Colors.amber,
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '$rating',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -396,10 +285,35 @@ class _WishlistScreenState extends State<WishlistScreen>
       ),
       floatingActionButton: wishlist.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: () {
+              onPressed: () async {
+                bool allSuccess = true;
+
+                for (var item in wishlist) {
+                  final product = item['productId'];
+                  final prices = product['prices'];
+
+                  if (prices != null && prices.isNotEmpty) {
+                    final priceObj = prices[0];
+                    final productId = product['_id'];
+                    final priceId = priceObj['_id'];
+
+                    bool success = await CartService.addToCart(
+                      productId: productId,
+                      priceId: priceId,
+                      quantity: 1,
+                    );
+
+                    if (!success) {
+                      allSuccess = false;
+                    }
+                  }
+                }
+
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('All items added to cart'),
+                  SnackBar(
+                    content: Text(allSuccess
+                        ? 'All items added to cart successfully'
+                        : 'Some items could not be added'),
                   ),
                 );
               },

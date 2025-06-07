@@ -1,18 +1,16 @@
-import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/user_provider.dart';
-import 'package:happy_farm/screens/login_prompt_screen.dart';
+import 'package:happy_farm/screens/login_screen.dart';
 import 'package:happy_farm/screens/order_screen.dart';
 import 'package:happy_farm/screens/profile_screen.dart';
 import 'package:happy_farm/screens/wishlist_screen.dart';
+import 'package:happy_farm/service/user_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:happy_farm/screens/cart_screen.dart';
 import 'package:happy_farm/screens/home_screen.dart';
 import 'utils/app_theme.dart';
-import 'package:http/http.dart' as http;
 
 void main() {
   HttpOverrides.global = MyHttpOverrides();
@@ -50,14 +48,15 @@ class MyHttpOverrides extends HttpOverrides {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  final int selectedIndex;
+  const MainScreen({Key? key, this.selectedIndex = 0}) : super(key: key);
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
   String? _userId;
   bool _isCheckingLogin = true;
   bool _isLoggedIn = false;
@@ -65,35 +64,24 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.selectedIndex;
     _checkLoginStatus();
     getUser();
   }
 
   Future<void> getUser() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('token');
-    String? userId = prefs.getString('userId');
-    if (userId != null && token != null) {
-      final url = Uri.parse('https://api.sabbafarm.com/api/user/$userId');
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': '$token',
-        },
-      );
+    if (userId != null) {
+      final userData = await UserService().fetchUserDetails(userId);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print(data['name']);
-
+      if (userData != null) {
         Provider.of<UserProvider>(context, listen: false).setUser(
-          username: data['name'],
-          email: data['email'],
-          phoneNumber: data['phone'],
+          username: userData['name'] ?? 'No Name',
+          email: userData['email'] ?? 'No Email',
+          phoneNumber: userData['phone'] ?? 'No Phone',
         );
-      } else {
-        print('Failed to load profile: ${response.statusCode}');
       }
     }
   }
@@ -106,7 +94,6 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _isLoggedIn = token != null && userId != null;
       _userId = userId;
-      _selectedIndex = 0; // Always default to Home
       _isCheckingLogin = false;
     });
   }
@@ -125,28 +112,11 @@ class _MainScreenState extends State<MainScreen> {
       );
     }
 
-    String _getTitleForIndex(int index) {
-      switch (index) {
-        case 0:
-          return 'Home';
-        case 1:
-          return 'Orders';
-        case 2:
-          return 'Wishlist';
-        case 3:
-          return 'Cart';
-        case 4:
-          return 'Account';
-        default:
-          return 'Sabba Farm';
-      }
+    if (!_isLoggedIn) {
+      return const LoginScreen(); // Navigate to LoginScreen directly
     }
 
     Widget _getScreen(int index) {
-      if (!_isLoggedIn && index != 0) {
-        return LoginPromptScreen(title: _getTitleForIndex(index),);
-      }
-
       switch (index) {
         case 0:
           return const HomeScreen();
@@ -180,10 +150,6 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             backgroundColor: AppTheme.primaryColor,

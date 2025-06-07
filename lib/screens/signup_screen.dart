@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/utils/app_theme.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:happy_farm/screens/login_screen.dart';
-
+import 'package:happy_farm/service/user_service.dart';
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
 
@@ -17,56 +15,42 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
+  final UserService _authService=UserService();
   bool _isLoading = false;
   String? _errorMessage;
 
-  Future<void> _submitForm() async {
+   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null; // Reset error message
+      _errorMessage = null;
     });
 
-    final url = Uri.parse('https://api.sabbafarm.com/api/user/signup');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'name': _fullNameController.text,
-        'phone': _phoneController.text,
-        'email': _emailController.text,
-        'password': _passwordController.text,
-      }),
+    final result = await _authService.signUp(
+      name: _fullNameController.text,
+      phone: _phoneController.text,
+      email: _emailController.text,
+      password: _passwordController.text,
     );
 
     setState(() => _isLoading = false);
 
-    try {
-      final data = jsonDecode(response.body);
-      print(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? 'Account created!')),
-        );
-        Navigator.pop(context); // Or navigate to Login screen
-      } else {
-        final errorMsg = data['msg'] ?? 'Something went wrong';
-        setState(() => _errorMessage = errorMsg);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg)),
-        );
-      }
-    } catch (e) {
-      setState(() => _errorMessage = 'Unexpected error occurred.');
+    if (result != null && result['error'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unexpected error occurred.')),
+        SnackBar(content: Text('Account created successfully!')),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    } else {
+      setState(() => _errorMessage = result?['error'] ?? 'Unexpected error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_errorMessage!)),
       );
     }
   }
-
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:happy_farm/main.dart';
 import 'package:happy_farm/models/product_model.dart';
 import 'package:happy_farm/models/user_provider.dart';
-import 'package:happy_farm/screens/login_screen.dart';
+import 'package:happy_farm/service/cart_service.dart';
+import 'package:happy_farm/service/review_service.dart';
+import 'package:happy_farm/service/whislist_service.dart';
+import 'package:happy_farm/widgets/snackbar.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class ProductDetails extends StatefulWidget {
   final dynamic
@@ -22,19 +23,23 @@ class _ProductDetailsState extends State<ProductDetails> {
   int quantity = 1;
   int reviewRating = 1;
   final TextEditingController reviewController = TextEditingController();
-  bool isWishlist = false;
   List<dynamic> reviews = [];
   bool isLoadingReviews = true;
   bool isExpanded = false;
   bool isExpanded1 = false;
   bool isSubmitting = false;
-  bool isWishLoad = false;
+  bool isWish = false;
+  bool isCart = false;
   String wishId = "";
+  bool isLoadingWish = false;
+  bool isLoadingCart = false;
 
   @override
   void initState() {
     super.initState();
     fetchReviews();
+    isWish = getIsWishList();
+    isCart = getIsCart();
     checkWishlistStatus();
   }
 
@@ -79,181 +84,167 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
+  bool getIsWishList() {
+    return widget.product.isAddedToWishlist ?? false;
+  }
+
+  bool getIsCart() {
+    return widget.product.isAddedToCart ?? false;
+  }
+
   List<dynamic> getProductPrices() {
     return widget.product.prices;
   }
 
   Future<void> checkWishlistStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString('token');
-
-    if (userId == null || token == null) return;
-    setState(() {
-      isWishLoad = true;
-    });
     try {
-      final response = await http.get(
-          Uri.parse("https://api.sabbafarm.com/api/my-list?userId=$userId"),
-          headers: {"Authorization": token});
+      final wishlist = await WishlistService.fetchWishlist();
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body) as Map<String, dynamic>;
-        final List<dynamic> wishlist = decoded['data'];
-        final matchedItem = wishlist.firstWhere(
-          (item) => item['productId']['_id'] == getProductId(),
-          orElse: () => null,
-        );
+      final matchedItem = wishlist.firstWhere(
+        (item) => item['productId']['_id'] == getProductId(),
+        orElse: () => <String, dynamic>{}, // return an empty map
+      );
 
-        setState(() {
-          isWishlist = matchedItem != null;
-          wishId = matchedItem?['_id']; // safely assigns null if not found
-        });
-      }
+      final found = matchedItem.isNotEmpty;
+
+      setState(() {
+        wishId = found ? matchedItem['_id'] : null;
+      });
     } catch (e) {
-      print(e);
-    } finally {
-      isWishLoad = false;
+      print('Error checking wishlist status: $e');
     }
   }
 
   Future<void> fetchReviews() async {
-    try {
-      final response = await http.get(
-        Uri.parse(
-            "https://api.sabbafarm.com/api/productReviews?productId=${getProductId()}"),
-      );
+    setState(() {
+      isLoadingReviews = true;
+    });
 
-      if (response.statusCode == 200) {
+    try {
+      final response =
+          await ReviewService().getReviews(productId: getProductId());
+
+      if (response['success'] == true && response['data'] != null) {
         setState(() {
-          reviews = json.decode(response.body);
-          isLoadingReviews = false;
+          reviews = response['data'];
         });
       } else {
-        setState(() {
-          isLoadingReviews = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to load reviews")),
+          SnackBar(
+              content: Text(response['message'] ?? "Failed to load reviews")),
         );
       }
     } catch (e) {
-      setState(() {
-        isLoadingReviews = false;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error loading reviews: $e")),
       );
+    } finally {
+      setState(() {
+        isLoadingReviews = false;
+      });
     }
   }
 
   Future<void> addWishList() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString('token');
     final productId = getProductId();
 
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not logged in")),
-      );
-      return;
-    }
-
-    final body = {
-      "productId": productId,
-      "userId": userId,
-    };
-
-    final response = await http.post(
-      Uri.parse("https://api.sabbafarm.com/api/my-list/add"),
-      headers: {"Content-Type": "application/json", "Authorization": "$token"},
-      body: json.encode(body),
-    );
-    if (response.statusCode == 201) {
-      final decoded = json.decode(response.body);
-      print(response.body);
+    try {
       setState(() {
-        isWishlist = true;
-        wishId = decoded['_id'];
+        isLoadingWish = true;
+      });
+      final String id = await WishlistService.addToMyList(productId);
+      setState(() {
+        isWish = true;
+        wishId = id;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Added to wishlist")),
+        const SnackBar(content: Text("Added to wishlist")),
       );
-    } else {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed: ${response.body}")),
+        SnackBar(content: Text("Failed to add to wishlist: $e")),
       );
+    } finally {
+      isLoadingWish = false;
     }
   }
 
-  void removeWishlist() async {
+  Future<void> removeWishlist() async {
     final wishlistItemId = wishId;
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('token');
-
-    final url =
-        Uri.parse('https://api.sabbafarm.com/api/my-list/$wishlistItemId');
     print(wishlistItemId);
     try {
-      final response = await http.delete(
-        url,
-        headers: {
-          'Authorization': '$token',
-          'Content-Type': 'application/json',
-        },
-      );
-      if (response.statusCode == 200) {
+      setState(() {
+        isLoadingWish = true;
+      });
+      final success = await WishlistService.removeFromWishlist(wishlistItemId);
+      if (success) {
         setState(() {
-          isWishlist = false;
+          isWish = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Item removed from wishlist')),
+          const SnackBar(content: Text('Item removed from wishlist')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove item')),
+          const SnackBar(content: Text('Failed to remove item')),
         );
       }
     } catch (e) {
-      print(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      isLoadingWish = false;
     }
   }
 
   Future<void> addToCart() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString("token");
+    final productId = getProductId();
     final price = getProductPrices()[selectedPriceIndex];
-
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("User not logged in")),
-      );
-      return;
-    }
-
-    final body = {
-      "productId": getProductId(),
-      "priceId": price.id,
-      "userId": userId,
-      "quantity": quantity,
-    };
-
-    final response = await http.post(
-      Uri.parse("https://api.sabbafarm.com/api/cart/add"),
-      headers: {"Content-Type": "application/json", "Authorization": "$token"},
-      body: json.encode(body),
+    setState(() {
+      isLoadingCart = true;
+    });
+    final success = await CartService.addToCart(
+      productId: productId,
+      priceId: price.id,
+      quantity: quantity,
     );
 
-    if (response.statusCode == 201) {
+    if (success) {
+      setState(() {
+        isCart = true;
+        isLoadingCart = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Added to cart!")),
+        SnackBar(
+          content: const Text("Item added to cart"),
+          action: SnackBarAction(
+            label: "GO TO CART",
+            textColor: Colors.amber,
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const MainScreen(selectedIndex: 3),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+          backgroundColor: Colors.black87,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(12),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
+        ),
       );
     } else {
+      setState(() {
+        isLoadingCart= false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to add: ${response.body}")),
+        const SnackBar(content: Text("Failed to add to cart")),
       );
     }
   }
@@ -264,47 +255,28 @@ class _ProductDetailsState extends State<ProductDetails> {
     if (reviewText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("Please add a Review"), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString('token');
-
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Please Login first"), backgroundColor: Colors.red),
+          content: Text("Please add a Review"),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
 
     final user = Provider.of<UserProvider>(context, listen: false).user;
-    final Map<String, dynamic> reviewData = {
-      "productId": getProductId(),
-      "customerName": user.username,
-      "customerId": userId,
-      "review": reviewText,
-      "customerRating": reviewRating,
-    };
 
     setState(() {
       isSubmitting = true;
     });
 
     try {
-      final response = await http.post(
-        Uri.parse("https://api.sabbafarm.com/api/productReviews/add"),
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(reviewData),
+      final result = await ReviewService.addReview(
+        productId: getProductId(),
+        reviewText: reviewText,
+        customerRating: reviewRating,
+        customerName: user.username,
       );
 
-      if (response.statusCode == 201) {
+      if (result['success'] == true) {
         reviewController.clear();
         setState(() {
           reviewRating = 1;
@@ -317,7 +289,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SnackBar(content: Text("Review submitted successfully!")),
         );
       } else {
-        throw Exception("Failed to submit review: ${response.statusCode}");
+        throw Exception(result['message'] ?? "Failed to submit review");
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -328,31 +300,6 @@ class _ProductDetailsState extends State<ProductDetails> {
         isSubmitting = false;
       });
     }
-  }
-
-  void _showLoginDialog({required Function onLogin}) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Login Required'),
-        content: const Text('Please log in to continue.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -476,16 +423,8 @@ class _ProductDetailsState extends State<ProductDetails> {
           top: 16,
           right: 16,
           child: GestureDetector(
-            onTap: () async {
-              SharedPreferences prefs = await SharedPreferences.getInstance();
-              final token = prefs.getString('token');
-              final userId = prefs.getString('userId');
-
-              if (token == null || userId == null) {
-                _showLoginDialog(onLogin: () {});
-              } else {
-                isWishlist ? removeWishlist() : addWishList();
-              }
+            onTap: () {
+              isWish ? removeWishlist() : addWishList();
             },
             child: Container(
               height: 40,
@@ -495,34 +434,35 @@ class _ProductDetailsState extends State<ProductDetails> {
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Center(
-                child: AnimatedSwitcher(
-                  duration: Duration(milliseconds: 300),
-                  transitionBuilder: (child, animation) {
-                    return ScaleTransition(scale: animation, child: child);
-                  },
-                  child: isWishLoad
-                      ? SizedBox(
-                          key: ValueKey('loading'),
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.redAccent),
-                          ),
-                        )
-                      : AnimatedScale(
-                          scale: isWishlist ? 1.2 : 1.0,
+                child: isLoadingWish
+                    ? SizedBox(
+                        key: ValueKey('loading'),
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                        ),
+                      )
+                    : AnimatedSwitcher(
+                        duration: Duration(milliseconds: 300),
+                        transitionBuilder: (child, animation) {
+                          return ScaleTransition(
+                              scale: animation, child: child);
+                        },
+                        child: AnimatedScale(
+                          scale: isWish ? 1.2 : 1.0,
                           duration: Duration(milliseconds: 200),
                           curve: Curves.easeOut,
                           child: Icon(
-                            isWishlist ? Icons.favorite : Icons.favorite_border,
-                            key: ValueKey(isWishlist),
+                            isWish ? Icons.favorite : Icons.favorite_border,
+                            key: ValueKey(isWish),
                             color: Colors.redAccent,
                             size: 26,
                           ),
                         ),
-                ),
+                      ),
               ),
             ),
           ),
@@ -620,22 +560,22 @@ class _ProductDetailsState extends State<ProductDetails> {
 
         // Add to Cart Button
         ElevatedButton.icon(
-          onPressed: () async {
-            SharedPreferences prefs = await SharedPreferences.getInstance();
-            final token = prefs.getString('token');
-            final userId = prefs.getString('userId');
-
-            if (token == null || userId == null) {
-              _showLoginDialog(onLogin: () {});
-            } else {
-              addToCart();
-            }
+          onPressed: () {
+            isCart
+                ? Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (builder) => MainScreen(
+                              selectedIndex: 3,
+                            )),
+                    (route) => false,
+                  )
+                : addToCart();
           },
           icon: const Icon(
             Icons.shopping_cart,
             color: Colors.white,
           ),
-          label: const Text("Add To Cart"),
+          label: Text(isCart ? "Go to Cart" : isLoadingCart ? "Adding..." : "Add To Cart"),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),

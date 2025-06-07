@@ -1,16 +1,16 @@
+import 'dart:async';
+import 'package:happy_farm/service/banner_service.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/screens/filtered_products_screen.dart';
 import 'package:happy_farm/screens/productdetails_screen.dart';
 import 'package:happy_farm/widgets/shimmer_widget.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product_model.dart';
 import '../widgets/product_card.dart';
 import '../widgets/custom_app_bar.dart';
 import '../models/banner_model.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:async';
-// import 'package:happy_farm/screens/productdetails_screen.dart';
+import 'package:happy_farm/service/search_service.dart';
+import 'package:happy_farm/service/category_service.dart';
+import 'package:happy_farm/service/product_service.dart';
 
 enum HomePageView { home, menu, filtered }
 
@@ -48,9 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
   int _visibleFilteredCount = 10;
   String selectedCatId = '';
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   List<dynamic> _searchResults = [];
   bool isSearch = false;
+  final _searchService = SearchService();
+  final _productService = ProductService();
+  bool isLoadingSearch = false;
   @override
   void initState() {
     super.initState();
@@ -61,193 +63,151 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onSearchChanged(String query) async {
     setState(() {
-      _searchQuery = query;
-      isSearch =
-          query.isNotEmpty; // Show search results only if query is not empty
+      isSearch = query.isNotEmpty;
     });
 
     if (query.isEmpty) {
-      // Clear results if query is empty
       setState(() {
         _searchResults = [];
       });
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
     try {
-      final response = await http.get(
-        Uri.parse('https://api.sabbafarm.com/api/search?q=$query'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': '$token'
-        },
-      );
-      print(response.body);
-      if (response.statusCode == 200) {
-        final List<dynamic> results = json.decode(response.body);
-        setState(() {
-          _searchResults = results;
-        });
-      } else {
-        // Handle errors
-        setState(() {
-          _searchResults = [];
-        });
-      }
+      setState(() {
+        isLoadingSearch = true;
+      });
+      final results = await _searchService.searchProducts(query: query);
+      setState(() {
+        _searchResults = results as List;
+      });
     } catch (e) {
       print('Search error: $e');
       setState(() {
         _searchResults = [];
       });
+    } finally {
+      isLoadingSearch = false;
     }
   }
 
   Future<void> fetchCategories() async {
-    const url =
-        'https://api.sabbafarm.com/api/category'; // Adjust endpoint if needed
-    final response = await http.get(Uri.parse(url));
-
-    if (response.statusCode == 200) {
-      final decoded = json.decode(response.body);
-      final List data = decoded['categoryList'];
-      final categories = data.map((e) => CategoryModel.fromJson(e)).toList();
-
+    try {
+      final categories = await CategoryService.fetchCategories();
       setState(() {
         _categories = categories;
       });
-    } else {
-      throw Exception('Failed to load categories');
+    } catch (e) {
+      print('Error loading categories: $e');
     }
   }
 
-  Future<void> _fetchFilteredProducts({
-    int? minPrice,
-    int? maxPrice,
+  Future<void> _fetchProductsByRating({
     int? rating,
   }) async {
     setState(() {
       _isLoading = true;
     });
 
-    String baseUrl = 'https://api.sabbafarm.com/api/products';
-    String categoryId = selectedCatId; // Ensure this is set before calling
-    String url = '';
-
-    if (rating != null) {
-      url = '$baseUrl/rating?catId=$categoryId&rating=$rating';
-    } else if (minPrice != null && maxPrice != null) {
-      url =
-          '$baseUrl/filterByPrice?minPrice=$minPrice&maxPrice=$maxPrice&catId=$categoryId';
-    } else {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
     try {
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['products'];
-
-        final List<FilterProducts> products = data
-            .map<FilterProducts>((json) => FilterProducts.fromJson(json))
-            .toList();
-
-        if (products.isNotEmpty) {
-          // Navigate to FilteredProductsScreen
-          if (context.mounted) {
-            setState(() {
-              _filteredProducts = _filteredProducts; // Assign the result
-              _currentPage = HomePageView.filtered;
-            });
-          }
-        } else {
-          // Show message if no products
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No filtered products found.'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        }
+      final products = await _productService.getProductsByRating(
+        catId: selectedCatId,
+        rating: rating,
+      );
+      if (products.isNotEmpty) {
+        setState(() {
+          _filteredProducts = products;
+          _currentPage = HomePageView.filtered;
+        });
       } else {
-        throw Exception('Failed to load products');
-      }
-    } catch (e) {
-      debugPrint('Error fetching products: $e');
-      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text('No filtered products found.'),
+            duration: Duration(seconds: 2),
           ),
         );
       }
+    } catch (e) {
+      debugPrint('Error fetching filtered products: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> fetchFeaturedProducts() async {
-    const url =
-        'https://api.sabbafarm.com/api/products/featured'; // Replace with your real URL
-    final response = await http.get(Uri.parse(url));
-    print(response.body);
-    if (response.statusCode == 200) {
-      final List data = json.decode(response.body);
-      final List<FeaturedProduct> products = data
-          .map((product) => FeaturedProduct.fromJson(
-              product)) // Assuming Product model has a `fromJson` method
-          .toList();
       setState(() {
-        _featuredProducts = products;
-        _isLoading = false; // Update loading status
+        _isLoading = false;
       });
-    } else {
-      throw Exception('Failed to load featured products');
     }
   }
 
-  Future<void> _fetchProductsByCategory(String catName) async {
-    final url =
-        'https://api.sabbafarm.com/api/products/catName?catName=$catName';
-
+  Future<void> _fetchProductsByPrice({
+    int? minPrice,
+    int? maxPrice,
+  }) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data =
-            decoded['products']; // Make sure this matches your API
-
-        final List<FilterProducts> products = data
-            .map<FilterProducts>((json) => FilterProducts.fromJson(json))
-            .toList();
-
+      final products = await _productService.filterByPrice(
+        catId: selectedCatId,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+      );
+      if (products.isNotEmpty) {
         setState(() {
           _filteredProducts = products;
+          _currentPage = HomePageView.filtered;
         });
       } else {
-        throw Exception('Failed to load products for $catName');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No filtered products found.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
-      debugPrint('Error fetching products: $e');
+      debugPrint('Error fetching filtered products: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> fetchFeaturedProducts() async {
+    try {
+      final products = await _productService.getFeaturedProducts();
+      setState(() {
+        _featuredProducts = products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  Future<void> _fetchProductsByCategory(String catName) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final products = await _productService.getProductsByCatName(catName);
+      setState(() {
+        _filteredProducts = products;
+      });
+    } catch (e) {
+      debugPrint('Error fetching category products: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -256,35 +216,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> fetchAllProducts() async {
-    const url = 'https://api.sabbafarm.com/api/products'; // Your backend API
-
     try {
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        print(response.body);
-        final decoded = json.decode(response.body);
-
-        if (decoded['products'] != null && decoded['products'] is List) {
-          final List data = decoded['products'];
-
-          final List<AllProduct> products = data
-              .map((productJson) => AllProduct.fromJson(productJson))
-              .toList();
-
-          setState(() {
-            _allProducts = products;
-            _isLoading = false;
-          });
-        } else {
-          throw Exception('Invalid product list format');
-        }
-      } else {
-        throw Exception('Failed to load all products: ${response.statusCode}');
-      }
+      final products = await _productService.getProducts();
+      setState(() {
+        _allProducts = products;
+        _isLoading = false;
+      });
     } catch (e) {
-      print('Error fetching products: $e');
-      // You might want to show a Snackbar or error widget
+      print('Error fetching all products: $e');
     }
   }
 
@@ -311,6 +250,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchResults() {
+    if (isLoadingSearch) {
+      return const Center(child: Text('Loading...'));
+    }
+
     if (_searchResults.isEmpty) {
       return const Center(child: Text('No results found'));
     }
@@ -518,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Future.delayed(const Duration(milliseconds: 2000), () {
                       // Only call backend when user finishes dragging
                       if (selectedCatId.isNotEmpty) {
-                        _fetchFilteredProducts(
+                        _fetchProductsByPrice(
                           minPrice: values.start.round(),
                           maxPrice: values.end.round(),
                         );
@@ -571,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _selectedRating = stars;
                         });
 
-                        _fetchFilteredProducts(rating: _selectedRating);
+                        _fetchProductsByRating(rating: _selectedRating);
 
                         // Auto-remove checkmark after 2 seconds
                         Future.delayed(const Duration(seconds: 2), () {
@@ -937,6 +880,7 @@ class _AutoScrollBannerState extends State<AutoScrollBanner> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
   Timer? _timer;
+  final _bannerService = BannerService();
 
   @override
   void initState() {
@@ -945,21 +889,19 @@ class _AutoScrollBannerState extends State<AutoScrollBanner> {
   }
 
   Future<void> fetchBanners() async {
-    const url =
-        'https://api.sabbafarm.com/api/homeBanner/'; // Replace with your real URL
-    final response = await http.get(Uri.parse(url));
+    setState(() {});
 
-    if (response.statusCode == 200) {
-      final List data = json.decode(response.body);
-      final banners = data.map((e) => BannerModel.fromJson(e)).toList();
+    try {
+      final banners = await _bannerService.fetchMainBanners();
+      if (!mounted) return;
       setState(() {
         _banners = banners;
       });
-
-      // Start auto-scroll once banners are loaded
       _startAutoScroll();
-    } else {
-      throw Exception('Failed to load banners');
+    } catch (e) {
+      print('Error fetching banners: $e');
+      if (!mounted) return;
+      setState(() {});
     }
   }
 
@@ -968,9 +910,7 @@ class _AutoScrollBannerState extends State<AutoScrollBanner> {
       if (_banners.isEmpty) return;
 
       int nextPage = _currentIndex + 1;
-
       if (nextPage >= _banners.length) {
-        // Jump to first page without animation
         _pageController.jumpToPage(0);
         _currentIndex = 0;
       } else {
@@ -996,7 +936,7 @@ class _AutoScrollBannerState extends State<AutoScrollBanner> {
     return SizedBox(
       height: 180.0,
       child: _banners.isEmpty
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: Text('No banners available'))
           : PageView.builder(
               controller: _pageController,
               itemCount: _banners.length,

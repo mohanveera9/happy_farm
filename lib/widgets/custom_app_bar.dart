@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 
-class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+class CustomAppBar extends StatelessWidget {
   final VoidCallback onMenuTap;
   final bool showCloseButton;
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
 
   const CustomAppBar({
     Key? key,
     required this.onMenuTap,
     this.showCloseButton = false,
-    required this.searchController,
-    required this.onSearchChanged,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
-    final appBarHeight = screenHeight * 0.19;
+    final appBarHeight = screenHeight * 0.17;
 
     return Container(
       height: appBarHeight,
@@ -33,26 +29,33 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         top: mediaQuery.padding.top + 8,
         left: 16,
         right: 16,
-        bottom: 8,
+        bottom: 12,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Top Row
+          // Left: Close or Menu Button
+          IconButton(
+            icon: Icon(
+              showCloseButton ? Icons.close : Icons.menu,
+              color: Colors.white,
+            ),
+            onPressed: onMenuTap,
+          ),
+
+          // Center: Logo + Text
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Logo
               ClipOval(
                 child: Image.asset(
                   'assets/images/sb.png',
-                  height: 40,
-                  width: 40,
+                  height: 36,
+                  width: 36,
                   fit: BoxFit.cover,
                 ),
               ),
-
-              // Title
+              const SizedBox(width: 8),
               const Text(
                 'SabbaFarm',
                 style: TextStyle(
@@ -61,81 +64,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
-              // Notifications
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined,
-                    color: Colors.white),
-                onPressed: () {},
-              ),
             ],
           ),
 
-          const SizedBox(height: 5),
-
-          // Menu + Search
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  showCloseButton ? Icons.close : Icons.filter_list,
-                  color: Colors.white,
-                ),
-                onPressed: onMenuTap,
-              ),
-              Expanded(
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: searchController,
-                          onChanged: onSearchChanged,
-                          decoration: const InputDecoration(
-                            hintText: 'Search Product',
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(vertical: 10),
-                          ),
-                        ),
-                      ),
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: searchController,
-                        builder: (context, value, child) {
-                          return IconButton(
-                            icon: Icon(
-                              value.text.isEmpty
-                                  ? Icons.search
-                                  : Icons.clear,
-                              color: Colors.grey,
-                            ),
-                            onPressed: value.text.isEmpty
-                                ? null
-                                : () {
-                                    searchController.clear();
-                                    onSearchChanged('');
-                                  },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          // Right: Cart Icon
+          IconButton(
+            icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
+            onPressed: () {
+              // Handle cart navigation here
+            },
           ),
         ],
       ),
     );
   }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight * 2.5);
 }

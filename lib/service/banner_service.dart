@@ -19,8 +19,9 @@ class BannerService {
   Future<List<BannerModel>> fetchMainBanners() async {
     try {
       final headers = await getHeaders();
-      final response = await http.get(Uri.parse('$baseUrl/banners'), headers: headers);
+      final response = await http.get(Uri.parse('$baseUrl/homeBanner'), headers: headers);
 
+        print(response.body);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => BannerModel.fromJson(json)).toList();

@@ -4,6 +4,7 @@ import 'package:happy_farm/models/user_provider.dart';
 import 'package:happy_farm/screens/login_screen.dart';
 import 'package:happy_farm/screens/order_screen.dart';
 import 'package:happy_farm/screens/profile_screen.dart';
+import 'package:happy_farm/screens/search_screen.dart';
 import 'package:happy_farm/screens/wishlist_screen.dart';
 import 'package:happy_farm/service/user_service.dart';
 import 'package:provider/provider.dart';
@@ -121,11 +122,11 @@ class _MainScreenState extends State<MainScreen> {
         case 0:
           return const HomeScreen();
         case 1:
-          return const OrdersScreen();
+          return const SearchScreen();
         case 2:
           return const WishlistScreen();
         case 3:
-          return CartScreen(userId: _userId ?? '');
+          return const OrdersScreen();
         case 4:
           return const ProfileScreen();
         default:
@@ -152,9 +153,9 @@ class _MainScreenState extends State<MainScreen> {
         child: ClipRRect(
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
-            backgroundColor: AppTheme.primaryColor,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white70,
+            backgroundColor: Colors.white,
+            selectedItemColor: AppTheme.primaryColor,
+            unselectedItemColor: Colors.grey,
             selectedFontSize: 12,
             unselectedFontSize: 12,
             currentIndex: _selectedIndex,
@@ -166,9 +167,9 @@ class _MainScreenState extends State<MainScreen> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.inventory_2_outlined),
-                activeIcon: Icon(Icons.inventory_2),
-                label: 'Orders',
+                icon: Icon(Icons.search),
+                activeIcon: Icon(Icons.search),
+                label: 'Search',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.favorite_border),

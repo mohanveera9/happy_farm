@@ -6,7 +6,6 @@ import 'package:happy_farm/screens/productdetails_screen.dart';
 import 'package:happy_farm/widgets/shimmer_widget.dart';
 import '../models/product_model.dart';
 import '../widgets/product_card.dart';
-import '../widgets/custom_app_bar.dart';
 import '../models/banner_model.dart';
 import 'package:happy_farm/service/search_service.dart';
 import 'package:happy_farm/service/category_service.dart';
@@ -231,12 +230,48 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: CustomAppBar(
-        onMenuTap:
-            _currentPage == HomePageView.menu ? _onCloseMenu : _onMenuTap,
-        showCloseButton: _currentPage == HomePageView.menu,
-        searchController: _searchController,
-        onSearchChanged: _onSearchChanged,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1, // Small shadow to separate AppBar from body
+        automaticallyImplyLeading: false,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left: Menu or Close
+            IconButton(
+              icon: Icon(
+                _currentPage == HomePageView.menu ? Icons.close : Icons.menu,
+                color: Colors.black87,
+              ),
+              onPressed:
+                  _currentPage == HomePageView.menu ? _onCloseMenu : _onMenuTap,
+            ),
+
+            // Center: Icon + Text
+            Row(
+              children: const [
+                Icon(Icons.agriculture, color: Color(0xFF4CAF50)),
+                SizedBox(width: 6),
+                Text(
+                  'SabbaFarm',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+
+            // Right: Cart Icon
+            IconButton(
+              icon: const Icon(Icons.shopping_cart_outlined,
+                  color: Colors.black87),
+              onPressed: () {
+                // Navigate to cart
+              },
+            ),
+          ],
+        ),
       ),
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(

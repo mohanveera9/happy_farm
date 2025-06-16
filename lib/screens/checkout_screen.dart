@@ -150,7 +150,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _orderIdFromBackend = orderData['paymentHistoryId'];
 
       var options = {
-        'key': 'rzp_live_DJA2rvcCmZFLh3',
+        'key': 'rzp_live_fIraFAOg9vHTJe
+lvws0GI4u5poUGy3W2lEos3D',
         'amount': orderData['razorpayAmount'],
         'currency': orderData['currency'] ?? 'INR',
         'name': 'E-Bharat',

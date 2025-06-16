@@ -6,33 +6,39 @@ import 'package:happy_farm/models/cart_model.dart';
 class CartService {
   static const String baseUrl = 'https://happyfarm-server.onrender.com/api/cart';
 
-  static Future<List<CartItem>> fetchCart(String userId) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('token');
+  static Future<List<CartItem>> fetchCart() async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final String? token = prefs.getString('token');
 
-    final Uri url = Uri.parse("$baseUrl?userId=$userId");
-
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': token,
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['data'] is List) {
-        return (data['data'] as List)
-            .map((item) => CartItem.fromJson(item))
-            .toList();
-      } else {
-        throw Exception('Unexpected response format');
-      }
-    } else {
-      throw Exception('Failed to load cart data: ${response.statusCode}');
-    }
+  if (token == null) {
+    throw Exception('Token not found. User might not be logged in.');
   }
+
+  final Uri url = Uri.parse(baseUrl); 
+
+  final response = await http.get(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+  );
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    print('daaaa:$data');
+    if (data['data'] is List) {
+      return (data['data'] as List)
+          .map((item) => CartItem.fromJson(item))
+          .toList();
+    } else {
+      throw Exception('Unexpected response format: "data" is not a list');
+    }
+  } else {
+    throw Exception('Failed to load cart: ${response.statusCode} - ${response.body}');
+  }
+}
+
 
   static Future<bool> deleteCartItem(String cartItemId) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -53,36 +59,35 @@ class CartService {
       throw Exception('Failed to delete cart item: ${response.statusCode}');
     }
   }
+static Future<bool> addToCart({
+  required String productId,
+  required String priceId,
+  required int quantity,
+}) async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
 
-  static Future<bool> addToCart({
-    required String productId,
-    required String priceId,
-    required int quantity,
-  }) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString('token');
+  if (token == null) return false;
 
-    if (userId == null) return false;
+  final body = {
+    "productId": productId,
+    "priceId": priceId,
+    "quantity": quantity,
+  };
 
-    final body = {
-      "productId": productId,
-      "priceId": priceId,
-      "userId": userId,
-      "quantity": quantity,
-    };
+  final response = await http.post(
+    Uri.parse("$baseUrl/add"), // Make sure this URL matches your actual backend route
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token",
+    },
+    body: json.encode(body),
+  );
 
-    final response = await http.post(
-      Uri.parse("$baseUrl/add"),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": token ?? "",
-      },
-      body: json.encode(body),
-    );
+  print('🛒 addToCart response: ${response.statusCode} - ${response.body}');
+  return response.statusCode == 201;
+}
 
-    return response.statusCode == 201;
-  }
 
   //Get Cart Item by ID
   static Future<CartItem> getCartItemById(String cartItemId) async {

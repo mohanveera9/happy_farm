@@ -32,7 +32,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _fetchCart() {
-    CartService.fetchCart(widget.userId).then((items) {
+    CartService.fetchCart().then((items) {
       setState(() {
         _cartItems = items;
       });
@@ -40,21 +40,22 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   int _calculateTotal() {
-    return _cartItems.fold(0, (sum, item) => sum + item.subTotal);
-  }
+  return _cartItems.fold(0, (sum, item) => sum + item.subTotal.toInt());
+}
+
 
   @override
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color.fromRGBO(245, 245, 245, 1),
       appBar: AppBar(
         title: const Text("My Cart"),
         centerTitle: true,
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: true,
       ),
       body: _isLoading
           ? Center(child: Lottie.asset('assets/lottie/cartloading.json'))
@@ -101,126 +102,136 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildCartItem(CartItem item) {
-    int itemIndex = _cartItems.indexOf(item);
-    int countInStock = item.product.prices[0].countInStock;
-    int actualPrice = item.product.prices[0].actualPrice;
+Widget _buildCartItem(CartItem item) {
+  int itemIndex = _cartItems.indexOf(item);
+  int countInStock = item.product.prices.first.countInStock;
+  double actualPrice = item.product.prices.first.actualPrice;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ProductDetails(product: item.product),
-        ));
-      },
-      child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade300)),
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  item.product.images.first,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                ),
+  return GestureDetector(
+    onTap: () {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ProductDetails(product: item.product),
+      ));
+    },
+    child: Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                item.product.images.first,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.product.name,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Rs.${actualPrice.toStringAsFixed(2)}",
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Subtotal: Rs.${item.subTotal}",
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () async {
-                        bool success =
-                            await CartService.deleteCartItem(item.id);
-                        if (success) {
-                          setState(() {
-                            _cartItems.removeAt(itemIndex);
-                          });
-                        }
-                      }),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.remove_circle_outline,
-                          color: item.quantity == 1
-                              ? Colors.grey
-                              : Colors.deepOrange,
-                        ),
-                        onPressed: item.quantity == 1
-                            ? null
-                            : () {
-                                setState(() {
-                                  _cartItems[itemIndex] = CartItem(
-                                    id: item.id,
-                                    product: item.product,
-                                    quantity: item.quantity - 1,
-                                    subTotal: (item.quantity - 1) * actualPrice,
-                                  );
-                                });
-                              },
-                      ),
-                      Text(item.quantity.toString()),
-                      IconButton(
-                        icon: Icon(
-                          Icons.add_circle_outline,
-                          color: item.quantity == countInStock
-                              ? Colors.grey
-                              : Colors.green,
-                        ),
-                        onPressed: item.quantity == countInStock
-                            ? null
-                            : () {
-                                setState(() {
-                                  _cartItems[itemIndex] = CartItem(
-                                    id: item.id,
-                                    product: item.product,
-                                    quantity: item.quantity + 1,
-                                    subTotal: (item.quantity + 1) * actualPrice,
-                                  );
-                                });
-                              },
-                      ),
-                    ],
+                  Text(
+                    item.product.name,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Rs.${actualPrice.toStringAsFixed(2)}",
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Subtotal: Rs.${item.subTotal.toStringAsFixed(2)}",
+                    style:
+                        const TextStyle(fontSize: 13, color: Colors.grey),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            Column(
+              children: [
+                IconButton(
+                  icon:
+                      const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () async {
+                    bool success =
+                        await CartService.deleteCartItem(item.id);
+                    if (success) {
+                      setState(() {
+                        _cartItems.removeAt(itemIndex);
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.remove_circle_outline,
+                        color: item.quantity == 1
+                            ? Colors.grey
+                            : Colors.deepOrange,
+                      ),
+                      onPressed: item.quantity == 1
+                          ? null
+                          : () {
+                              int newQty = item.quantity - 1;
+                              setState(() {
+                                _cartItems[itemIndex] = CartItem(
+                                  id: item.id,
+                                  priceId: item.priceId,
+                                  userId: item.userId,
+                                  product: item.product,
+                                  quantity: newQty,
+                                  subTotal: actualPrice * newQty,
+                                );
+                              });
+                            },
+                    ),
+                    Text(item.quantity.toString()),
+                    IconButton(
+                      icon: Icon(
+                        Icons.add_circle_outline,
+                        color: item.quantity == countInStock
+                            ? Colors.grey
+                            : Colors.green,
+                      ),
+                      onPressed: item.quantity == countInStock
+                          ? null
+                          : () {
+                              int newQty = item.quantity + 1;
+                              setState(() {
+                                _cartItems[itemIndex] = CartItem(
+                                  id: item.id,
+                                  priceId: item.priceId,
+                                  userId: item.userId,
+                                  product: item.product,
+                                  quantity: newQty,
+                                  subTotal: actualPrice * newQty,
+                                );
+                              });
+                            },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCouponField() {
     return Container(
@@ -321,7 +332,7 @@ class _CartScreenState extends State<CartScreen> {
             ElevatedButton(
               onPressed: () {
                 final totalAmount =
-                    _cartItems.fold(0, (sum, item) => sum + item.subTotal);
+                    _cartItems.fold(0, (sum, item) => sum + item.subTotal.toInt());
                 Navigator.push(
                   context,
                   MaterialPageRoute(

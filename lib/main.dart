@@ -9,7 +9,6 @@ import 'package:happy_farm/screens/wishlist_screen.dart';
 import 'package:happy_farm/service/user_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:happy_farm/screens/cart_screen.dart';
 import 'package:happy_farm/screens/home_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -177,9 +176,9 @@ class _MainScreenState extends State<MainScreen> {
                 label: 'Wishlist',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_cart_outlined),
-                activeIcon: Icon(Icons.shopping_cart),
-                label: 'Cart',
+                icon: Icon(Icons.receipt_long_outlined),
+                activeIcon: Icon(Icons.receipt_long),
+                label: 'Orders',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),

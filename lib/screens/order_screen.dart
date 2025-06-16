@@ -149,6 +149,23 @@ class OrderCard extends StatelessWidget {
   final Map order;
 
   OrderCard({required this.order, required this.onTap});
+  
+  void cancelOrderHandler(BuildContext context, String orderId) async {
+  final orderService = OrderService();
+  final result = await orderService.cancelOrder(orderId);
+
+  if (result?['success'] == true) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Order Cancelled: ${result?['message']}')),
+    );
+    // Optional: Refresh orders list or navigate back
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Cancel Failed: ${result?['message']}')),
+    );
+  }
+}
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
@@ -192,86 +209,156 @@ class OrderCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Card(
-        margin: EdgeInsets.symmetric(vertical: 8),
-        elevation: 0,
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        elevation: 1,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade300)),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade300),
+        ),
         child: Padding(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top row
+              /// Order ID and Status
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                      "ORD${order['_id'].toString().substring(0, 6).toUpperCase()}",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                    "ORD${order['_id'].toString().substring(0, 6).toUpperCase()}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: _getStatusColor(order['orderStatus'] ?? '')
                           .withOpacity(0.1),
                       border: Border.all(
-                          color: _getStatusColor(order['orderStatus'] ?? '')),
+                        color: _getStatusColor(order['orderStatus'] ?? ''),
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       children: [
-                        Icon(_getStatusIcon(order['orderStatus'] ?? ''),
+                        Icon(
+                          _getStatusIcon(order['orderStatus'] ?? ''),
+                          color: _getStatusColor(order['orderStatus'] ?? ''),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          order['orderStatus'].toString().capitalize(),
+                          style: TextStyle(
                             color: _getStatusColor(order['orderStatus'] ?? ''),
-                            size: 16),
-                        SizedBox(width: 4),
-                        Text(order['orderStatus'].toString().capitalize(),
-                            style: TextStyle(
-                                color:
-                                    _getStatusColor(order['orderStatus'] ?? ''),
-                                fontSize: 12)),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-              Divider(),
-              // Order info
+
+              const SizedBox(height: 12),
+              const Divider(thickness: 0.8),
+
+              /// Order Info
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Order Date\n$orderDate",
-                      style: TextStyle(fontSize: 13)),
-                  Text(
-                      "Items\n${(order['products'] as List?)?.length ?? 0} items",
-                      style: TextStyle(fontSize: 13)),
-                  Text("Total\n₹$totalAmount",
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green)),
+                  _orderInfoTile("Order Date", orderDate),
+                  _orderInfoTile("Items",
+                      "${(order['products'] as List?)?.length ?? 0} items"),
+                  _orderInfoTile(
+                    "Total",
+                    "₹$totalAmount",
+                    color: Colors.green,
+                    isBold: true,
+                  ),
                 ],
               ),
-              Divider(),
-              // Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Icon(Icons.location_on, size: 20, color: Color(0xFF007B4F)),
-                  Text("Track", style: TextStyle(color: Color(0xFF007B4F))),
-                  VerticalDivider(),
-                  Icon(Icons.remove_red_eye, size: 20, color: Colors.grey),
-                  Text("Details", style: TextStyle(color: Colors.grey)),
-                  VerticalDivider(),
-                  Icon(Icons.refresh, size: 20, color: Colors.blue),
-                  Text("Re-order", style: TextStyle(color: Colors.blue)),
-                ],
-              )
+
+              const SizedBox(height: 12),
+              const Divider(thickness: 0.8),
+
+              /// Cancel Button
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("Cancel Order"),
+                        content: const Text("Are you sure you want to cancel this order?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text("No"),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text("Yes"),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      cancelOrderHandler(context, order['_id']);
+                    }
+                  },
+                  icon: const Icon(Icons.cancel, color: Colors.white),
+                  label: const Text(
+                    "Cancel Order",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+Widget _orderInfoTile(String title, String value,
+    {Color color = Colors.black87, bool isBold = false}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          color: color,
+        ),
+      ),
+    ],
+  );
 }
 
 extension StringExtension on String {

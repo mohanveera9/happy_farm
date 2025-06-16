@@ -56,16 +56,20 @@ class OrderService {
       'razorpay_order_id': razorpayOrderId,
       'razorpay_payment_id': razorpayPaymentId,
       'razorpay_signature': razorpaySignature,
-      'orderId': orderId,
+      'paymentHistoryId': orderId,
     });
-
     final response = await http.post(
       Uri.parse('$baseUrl/payment/verify-order'),
       headers: headers,
       body: body,
     );
 
-    return response.statusCode == 200;
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+      return result['success'] == true;
+    } else {
+      return false;
+    }
   }
 
   // Fetch all orders for the authenticated user
@@ -108,6 +112,73 @@ class OrderService {
       }
     } catch (e) {
       print('Error fetching order by ID: $e');
+      return null;
+    }
+  }
+
+  // Add this inside the OrderService class
+  Future<Map<String, dynamic>?> cancelOrder(String orderId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders/user/cancel/$orderId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('manoj:$data');
+        return {
+          'success': true,
+          'message': data['message'],
+          'order': data['data']['order'],
+          'refund': data['data']['refund'],
+        };
+      } else {
+        final data = json.decode(response.body);
+        return {
+          'success': false,
+          'message': data['message'],
+        };
+      }
+    } catch (e) {
+      print('Error cancelling order: $e');
+      return {
+        'success': false,
+        'message': 'Something went wrong. Please try again later.',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>?> getRefundDetails({
+    String? status,
+    String? orderId,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+
+      final queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (status != null) 'status': status,
+        if (orderId != null) 'orderId': orderId,
+      };
+
+      final uri = Uri.parse('$baseUrl/orders/refunds')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('Failed to fetch refund details: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching refund details: $e');
       return null;
     }
   }

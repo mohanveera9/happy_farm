@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/cart_model.dart';
+import 'package:happy_farm/screens/ordersuccesspage.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:happy_farm/service/order_service.dart';
 import 'package:happy_farm/service/user_service.dart';
+
 class CheckoutScreen extends StatefulWidget {
   final List<CartItem> cartItems;
   final int totalAmount;
@@ -21,7 +23,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
   final _orderService = OrderService();
-  final _authService=UserService();
+  final _authService = UserService();
 
   late Razorpay _razorpay;
   final TextEditingController _nameController = TextEditingController();
@@ -69,7 +71,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-    void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    debugPrint('✅ Payment Successful!');
+    debugPrint('🔹 Payment ID: ${response.paymentId}');
+    debugPrint('🔹 Order ID: ${response.orderId}');
+    debugPrint('🔹 Signature: ${response.signature}');
+
     final verified = await _orderService.verifyPayment(
       razorpayOrderId: response.orderId!,
       razorpayPaymentId: response.paymentId!,
@@ -77,11 +84,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       orderId: _orderIdFromBackend!,
     );
 
+    debugPrint('🔍 Payment verification result: $verified');
+
     if (verified) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) =>
+                  OrderSuccessPage())); // or navigate to success page
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payment verification failed')),
       );
@@ -89,19 +105,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('❌ Payment Failed!');
+    debugPrint('🔹 Code: ${response.code}');
+    debugPrint('🔹 Message: ${response.message}');
+    debugPrint('🔹 Metadata: ${response.error}');
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Payment failed: ${response.message}')),
     );
   }
+
   void _handleExternalWallet(ExternalWalletResponse response) {
-    print("External Wallet: ${response.walletName}");
+    debugPrint('💼 External Wallet selected: ${response.walletName}');
   }
 
   String? _orderIdFromBackend;
 
- Future<void> _submitForm() async {
+  Future<void> _submitForm() async {
     final fullAddress =
         '${_address1Controller.text}, ${_address2Controller.text}, ${_cityController.text}, ${_stateController.text}, ${_countryController.text}';
+
+    debugPrint('📦 Starting order creation with:');
+    debugPrint('Name: ${_nameController.text}');
+    debugPrint('Phone: ${_phoneController.text}');
+    debugPrint('Email: ${_emailController.text}');
+    debugPrint('Address: $fullAddress');
+    debugPrint('Pincode: ${_zipController.text}');
 
     final orderResponse = await _orderService.createOrder(
       name: _nameController.text,
@@ -112,16 +141,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     if (orderResponse != null) {
+      debugPrint('✅ Order creation successful.');
       final orderData = orderResponse['data'];
-      _orderIdFromBackend = orderData['orderId'];
+      debugPrint('🔹 Razorpay Order ID: ${orderData['razorpayOrderId']}');
+      debugPrint('🔹 Amount (paise): ${orderData['razorpayAmount']}');
+      debugPrint('🔹 PaymentHistory ID: ${orderData['paymentHistoryId']}');
 
-      final options = {
+      _orderIdFromBackend = orderData['paymentHistoryId'];
+
+      var options = {
         'key': 'rzp_live_DJA2rvcCmZFLh3',
-        'amount': orderData['amount'],
+        'amount': orderData['razorpayAmount'],
         'currency': orderData['currency'] ?? 'INR',
         'name': 'E-Bharat',
         'description': 'Payment for your order',
-        'order_id': orderData['order_id'],
+        'order_id': orderData['razorpayOrderId'] ?? 'invalid',
         'prefill': {
           'name': _nameController.text,
           'email': _emailController.text,
@@ -130,8 +164,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'theme': {'color': '#007B4F'}
       };
 
-      _razorpay.open(options);
+      debugPrint('🧾 Razorpay Checkout Options: $options');
+
+      try {
+        _razorpay.open(options);
+      } catch (e) {
+        debugPrint('❌ Error opening Razorpay: $e');
+      }
     } else {
+      debugPrint('❌ Failed to create order from backend');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to create order')),
       );
@@ -198,15 +239,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: _buildFormTextField(
                   controller: _nameController,
                   label: "Full Name *",
-                  validator: (val) =>
-                      val == null || val.isEmpty ? 'Required' : null,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildFormTextField(
-                  controller: _countryController,
-                  label: "Country *",
                   validator: (val) =>
                       val == null || val.isEmpty ? 'Required' : null,
                 ),

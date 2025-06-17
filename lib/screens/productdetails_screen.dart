@@ -227,12 +227,6 @@ class _ProductDetailsState extends State<ProductDetails> {
             label: "GO TO CART",
             textColor: Colors.amber,
             onPressed: () {
-              // Navigator.of(context).pushAndRemoveUntil(
-              //   MaterialPageRoute(
-              //     builder: (context) => const MainScreen(selectedIndex: 3),
-              //   ),
-              //   (route) => false,
-              // );
               Navigator.push(
                   context,
                   MaterialPageRoute(

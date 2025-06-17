@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/cart_model.dart';
 import 'package:happy_farm/screens/ordersuccesspage.dart';
+
+import 'package:happy_farm/service/cart_service.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -72,11 +74,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    debugPrint('✅ Payment Successful!');
-    debugPrint('🔹 Payment ID: ${response.paymentId}');
-    debugPrint('🔹 Order ID: ${response.orderId}');
-    debugPrint('🔹 Signature: ${response.signature}');
-
     final verified = await _orderService.verifyPayment(
       razorpayOrderId: response.orderId!,
       razorpayPaymentId: response.paymentId!,
@@ -84,18 +81,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       orderId: _orderIdFromBackend!,
     );
 
-    debugPrint('🔍 Payment verification result: $verified');
-
     if (verified) {
+      await CartService.clearCart();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
       Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) =>
-                  OrderSuccessPage())); // or navigate to success page
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderSuccessPage(),
+        ),
+      ); // or navigate to success page
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,7 +147,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _orderIdFromBackend = orderData['paymentHistoryId'];
 
       var options = {
-        'key': 'rzp_live_DJA2rvcCmZFLh3',
+        'key': 'rzp_live_fIraFAOg9vHTJe',
         'amount': orderData['razorpayAmount'],
         'currency': orderData['currency'] ?? 'INR',
         'name': 'E-Bharat',

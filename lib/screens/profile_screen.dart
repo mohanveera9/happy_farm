@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/main.dart';
 import 'package:happy_farm/models/user_provider.dart';
+import 'package:happy_farm/screens/contact_screen.dart';
 import 'package:happy_farm/screens/privacypolicyscreen.dart';
 import 'package:happy_farm/screens/update_password.dart';
 import 'package:happy_farm/utils/app_theme.dart';
@@ -118,7 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       {
         'icon': Icons.lock_outlined,
         'title': 'Security',
-        'subtitle': 'Change password and security settings',
+        'subtitle': 'Change password',
         'function': () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -129,9 +130,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
       {
         'icon': Icons.help_outline,
-        'title': 'Help & Support',
+        'title': 'Contact & Support',
         'subtitle': 'Get assistance and answers',
-        'function': () {}
+        'function': () {
+          Navigator.push(context,
+              MaterialPageRoute(builder: (context) => ContactScreen()));
+        }
       },
       {
         'icon': Icons.privacy_tip_outlined,
@@ -200,7 +204,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
         margin: const EdgeInsets.only(bottom: 12),
@@ -237,11 +240,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey,
             ),
           ],
         ),

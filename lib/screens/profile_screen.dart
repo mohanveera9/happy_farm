@@ -235,7 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.green.shade800,
+                      color: Colors.grey,
                     ),
                   ),
                 ],

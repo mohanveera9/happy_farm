@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product_model.dart';
 import '../widgets/product_card.dart';
 import '../models/banner_model.dart';
-import 'package:happy_farm/service/search_service.dart';
 import 'package:happy_farm/service/category_service.dart';
 import 'package:happy_farm/service/product_service.dart';
 
@@ -37,7 +36,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onCloseMenu() {
     setState(() {
       _currentPage = HomePageView.home;
-      _filteredProducts = [];
     });
   }
 
@@ -49,16 +47,17 @@ class _HomeScreenState extends State<HomeScreen> {
   List<FilterProducts> _filteredProducts = [];
   int _visibleFeaturedCount = 2;
   int _visibleAllCount = 2;
-  int _visibleFilteredCount = 10;
   String selectedCatId = '';
-  final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _searchResults = [];
+  String selectedCatName = '';
   bool isSearch = false;
-  final _searchService = SearchService();
   final _productService = ProductService();
   bool isLoadingSearch = false;
   String? userId;
   int cartItemCount = 0;
+  String filteredCategoryName = '';
+  int filteredminPrice = 0;
+  int filteredmaxPrice = 60000;
+  int filteredrating = 0;
   @override
   void initState() {
     super.initState();
@@ -74,36 +73,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       userId = prefs.getString('userId');
     });
-  }
-
-  void _onSearchChanged(String query) async {
-    setState(() {
-      isSearch = query.isNotEmpty;
-    });
-
-    if (query.isEmpty) {
-      setState(() {
-        _searchResults = [];
-      });
-      return;
-    }
-
-    try {
-      setState(() {
-        isLoadingSearch = true;
-      });
-      final results = await _searchService.searchProducts(query: query);
-      setState(() {
-        _searchResults = results as List;
-      });
-    } catch (e) {
-      print('Search error: $e');
-      setState(() {
-        _searchResults = [];
-      });
-    } finally {
-      isLoadingSearch = false;
-    }
   }
 
   Future<void> loadCartItemCount() async {
@@ -137,7 +106,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isLoading = true;
     });
-
+    filteredCategoryName = selectedCatName;
+    filteredrating = rating!;
     try {
       final products = await _productService.getProductsByRating(
         catId: selectedCatId,
@@ -178,7 +148,9 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isLoading = true;
     });
-
+    filteredCategoryName = selectedCatName;
+    filteredmaxPrice = maxPrice!;
+    filteredminPrice = minPrice!;
     try {
       final products = await _productService.filterByPrice(
         catId: selectedCatId,
@@ -347,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         backgroundColor: const Color(0xFFF5F5F5),
         body: SafeArea(
-          child: isSearch ? _buildSearchResults() : _buildBodyContent(),
+          child: _buildBodyContent(),
         ),
       ),
     );
@@ -357,70 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return const ShimmerHomeScreen();
   }
 
-  Widget _buildSearchResults() {
-    if (isLoadingSearch) {
-      return const Center(child: Text('Loading...'));
-    }
-
-    if (_searchResults.isEmpty) {
-      return const Center(child: Text('No results found'));
-    }
-
-    return ListView.builder(
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final product = _searchResults[index];
-        final imageUrl =
-            (product['images'] != null && product['images'].isNotEmpty)
-                ? product['images'][0]
-                : null;
-        final priceInfo =
-            (product['prices'] != null && product['prices'].isNotEmpty)
-                ? product['prices'][0]
-                : null;
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: ListTile(
-            leading: imageUrl != null
-                ? Image.network(
-                    imageUrl,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.broken_image),
-                  )
-                : const Icon(Icons.image_not_supported),
-            title: Text(product['name'] ?? 'Unnamed Product'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (priceInfo != null)
-                  Text(
-                    'Price: ₹${priceInfo['actualPrice']}',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                if (product['catName'] != null)
-                  Text('Category: ${product['catName']}'),
-              ],
-            ),
-            onTap: () {
-              final productInstance = AllProduct.fromJson(product);
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (builder) =>
-                      ProductDetails(product: productInstance),
-                ),
-              );
-              // Navigate to product details screen with product['_id']
-            },
-          ),
-        );
-      },
-    );
-  }
-
+  
   Widget _buildBodyContent() {
     switch (_currentPage) {
       case HomePageView.menu:
@@ -433,7 +342,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _buildContentView(),
               );
       case HomePageView.filtered:
-        return FilteredProductsScreen(products: _filteredProducts);
+        return FilteredProductsScreen(
+          products: _filteredProducts,
+          categoryName: filteredCategoryName,
+          minPrice: filteredminPrice,
+          maxPrice: filteredmaxPrice,
+          rating: filteredrating,
+        );
     }
   }
 
@@ -454,15 +369,61 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Filter",
-                    style:
-                        TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Filter",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+
+                // Selected Filters Summary
+                if (selectedCatId.isNotEmpty ||
+                    _priceRange.start.round() != _minPrice.toInt() ||
+                    _priceRange.end.round() != _maxPrice.toInt() ||
+                    _selectedRating > 0)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (selectedCatId.isNotEmpty)
+                        Chip(
+                          label: Text(
+                            selectedCatName,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          backgroundColor: Colors.blue.shade50,
+                          avatar:
+                              const Icon(Icons.category, color: Colors.blue),
+                        ),
+                      if (_priceRange.start.round() != _minPrice.toInt() ||
+                          _priceRange.end.round() != _maxPrice.toInt())
+                        Chip(
+                          label: Text(
+                            '₹${_priceRange.start.round()} - ₹${_priceRange.end.round()}',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          backgroundColor: Colors.green.shade50,
+                          avatar: const Icon(Icons.price_change,
+                              color: Colors.green),
+                        ),
+                      if (_selectedRating > 0)
+                        Chip(
+                          label: Text(
+                            '$_selectedRating ★ & up',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          backgroundColor: Colors.orange.shade50,
+                          avatar: const Icon(Icons.star, color: Colors.orange),
+                        ),
+                    ],
+                  ),
+
                 const SizedBox(height: 20),
 
                 // CATEGORY FILTER
-                const Text("FILTER BY CATEGORY",
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  "FILTER BY CATEGORY",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 10),
                 _categories.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -481,6 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onTap: () {
                                   setState(() {
                                     selectedCatId = category.id;
+                                    selectedCatName = category.name;
                                   });
                                   _fetchProductsByCategory(category.name);
                                 },
@@ -544,16 +506,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 30),
 
                 // PRICE FILTER
-                const Text("FILTER BY PRICE",
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  "FILTER BY PRICE",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 10),
                 RangeSlider(
                   values: _priceRange,
                   min: _minPrice,
                   max: _maxPrice,
-                  divisions:
-                      (_maxPrice - _minPrice).toInt(), // smoother divisions
+                  divisions: (_maxPrice - _minPrice).toInt(),
                   activeColor: Colors.green,
                   inactiveColor: Colors.green.shade100,
                   labels: RangeLabels(
@@ -567,7 +529,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   onChangeEnd: (RangeValues values) {
                     Future.delayed(const Duration(milliseconds: 2000), () {
-                      // Only call backend when user finishes dragging
                       if (selectedCatId.isNotEmpty) {
                         _fetchProductsByPrice(
                           minPrice: values.start.round(),
@@ -575,7 +536,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
+                          const SnackBar(
                               content: Text('Please select a category first.')),
                         );
                       }
@@ -586,21 +547,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('From: Rs: ${_priceRange.start.round()}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('To: Rs: ${_priceRange.end.round()}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(
+                      'From: Rs: ${_priceRange.start.round()}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    Text(
+                      'To: Rs: ${_priceRange.end.round()}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
                   ],
                 ),
 
                 const SizedBox(height: 30),
 
                 // RATING FILTER
-                const Text("FILTER BY RATING",
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  "FILTER BY RATING",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 10),
                 Column(
                   children: List.generate(5, (index) {
@@ -611,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () {
                         if (selectedCatId.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            const SnackBar(
                                 content:
                                     Text('Please select a category first.')),
                           );
@@ -624,7 +590,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         _fetchProductsByRating(rating: _selectedRating);
 
-                        // Auto-remove checkmark after 2 seconds
                         Future.delayed(const Duration(seconds: 2), () {
                           if (mounted) {
                             setState(() {
@@ -714,7 +679,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  Expanded(child: _buildFilteredProducts(_filteredProducts)),
                 ],
               ),
             ),
@@ -900,68 +864,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildFilteredProducts(List<FilterProducts> filteredProducts) {
-    if (filteredProducts.isEmpty) {
-      return const Center(
-        child: Text(
-          "No products found.",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-      );
-    }
-
-    final visibleFilteredProducts =
-        filteredProducts.take(_visibleFilteredCount).toList();
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: visibleFilteredProducts.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.60,
-            ),
-            itemBuilder: (context, index) {
-              final product = visibleFilteredProducts[index];
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProductDetails(product: product),
-                    ),
-                  );
-                },
-                child: UniversalProductCard(product: product),
-              );
-            },
-          ),
-        ),
-        if (_visibleFilteredCount < filteredProducts.length)
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _visibleFilteredCount += 5;
-                if (_visibleFilteredCount > filteredProducts.length) {
-                  _visibleFilteredCount = filteredProducts.length;
-                }
-              });
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: const Color.fromARGB(255, 1, 140, 255),
-            ),
-            child: const Text('View All'),
-          ),
-      ],
     );
   }
 

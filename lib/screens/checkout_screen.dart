@@ -73,7 +73,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 16),
+                const Text("Finalizing your order..."),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    _showLoadingDialog(); // Show loading while verifying + clearing cart
+
     final verified = await _orderService.verifyPayment(
       razorpayOrderId: response.orderId!,
       razorpayPaymentId: response.paymentId!,
@@ -81,20 +107,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       orderId: _orderIdFromBackend!,
     );
 
+    if (!mounted) return;
+
+    Navigator.of(context).pop(); // Hide the loading dialog
+
     if (verified) {
       await CartService.clearCart();
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
-      Navigator.push(
+
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => OrderSuccessPage(),
         ),
-      ); // or navigate to success page
+      );
     } else {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payment verification failed')),
       );
@@ -147,7 +178,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _orderIdFromBackend = orderData['paymentHistoryId'];
 
       var options = {
-        'key': 'rzp_live_fIraFAOg9vHTJelvws0GI4u5poUGy3W2lEos3D',
+        'key': 'rzp_live_fIraFAOg9vHTJe',
         'amount': orderData['razorpayAmount'],
         'currency': orderData['currency'] ?? 'INR',
         'name': 'E-Bharat',

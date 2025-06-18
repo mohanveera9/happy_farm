@@ -7,6 +7,8 @@ import 'package:happy_farm/widgets/order_shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
   @override
@@ -14,9 +16,10 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   List orders = [];
   bool isLoading = true;
+  bool isRefreshing = false;
   late TabController _tabController;
 
   final List<String> statusTabs = ['All', 'pending', 'delivered', 'cancelled'];
@@ -26,6 +29,33 @@ class _OrdersScreenState extends State<OrdersScreen>
     super.initState();
     _tabController = TabController(length: statusTabs.length, vsync: this);
     fetchOrders();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    refreshOrders();
+  }
+
+  Future<void> refreshOrders() async {
+    setState(() => isRefreshing = true);
+    await fetchOrders();
+    setState(() => isRefreshing = false);
   }
 
   Future<void> fetchOrders() async {
@@ -73,6 +103,7 @@ class _OrdersScreenState extends State<OrdersScreen>
           ? Center(child: OrderShimmer())
           : Column(
               children: [
+                if (isRefreshing) const LinearProgressIndicator(minHeight: 2),
                 Container(
                   color: Colors.white,
                   child: TabBar(
@@ -118,7 +149,8 @@ class _OrdersScreenState extends State<OrdersScreen>
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => OrderDetailsPage(
-                                      orderId: order['_id'].toString()),
+                                    orderId: order['_id'].toString(),
+                                  ),
                                 ),
                               );
                             },
@@ -150,8 +182,6 @@ class OrderCard extends StatelessWidget {
   final Map order;
 
   OrderCard({required this.order, required this.onTap});
-
-  
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {

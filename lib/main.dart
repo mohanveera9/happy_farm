@@ -34,6 +34,7 @@ class MyApp extends StatelessWidget {
       title: 'Sabba Farm',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      navigatorObservers: [routeObserver],
       home: const MainScreen(),
     );
   }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:happy_farm/main.dart';
+import 'package:happy_farm/screens/refund_details.dart';
 import 'package:happy_farm/service/order_service.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:intl/intl.dart';
@@ -22,6 +24,45 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     fetchOrderDetails();
   }
 
+  void _checkRefundStatus(BuildContext context, String orderId) async {
+    final refundResponse =
+        await OrderService().getRefundDetails(orderId: orderId);
+
+    if (refundResponse != null && refundResponse['success'] == true) {
+      final refunds = refundResponse['data']['refunds'] as List<dynamic>;
+
+      final refund = refunds.firstWhere(
+        (r) => r['orderId']['_id'] == orderId,
+        orElse: () => null,
+      );
+
+      if (refund != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RefundDetailsScreen(refundData: refund),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No refund found for this order.')),
+        );
+      }
+    }
+  }
+
+  void showLoaderDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevents dismiss by tapping outside
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
+  }
+
   void cancelOrderHandler(BuildContext context, String orderId) async {
     final orderService = OrderService();
     final result = await orderService.cancelOrder(orderId);
@@ -30,7 +71,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Order Cancelled: ${result?['message']}')),
       );
-      // Optional: Refresh orders list or navigate back
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => MainScreen(
+                    selectedIndex: 3,
+                  )));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Cancel Failed: ${result?['message']}')),
@@ -162,9 +208,26 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                             onPressed: selectedReason == null
                                 ? null
                                 : () async {
-                                    Navigator.pop(context);
+                                    Navigator.pop(
+                                      context,
+                                    ); // Close the bottom sheet
+                                    print("open");
+                                    showLoaderDialog(
+                                      context,
+                                    ); // Show loading spinner
+                                    print('open2');
                                     cancelOrderHandler(
-                                        context, orderData!['_id']);
+                                      context,
+                                      orderData!['_id'],
+                                    );
+                                    print("done");
+                                    Navigator.pop(
+                                      context,
+                                    ); // Close the loader dialog after API completes
+                                    print('close');
+                                    setState(() {
+                                      fetchOrderDetails();
+                                    });
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red[600],
@@ -214,6 +277,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = AppTheme.primaryColor;
+    final String orderStatus =
+        orderData?['orderStatus']?.toString().toLowerCase() ?? '';
+
+    final bool isCancelled = orderStatus == 'cancelled';
 
     return Scaffold(
       appBar: AppBar(
@@ -231,6 +298,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 🚀 Order Summary Card
                       Card(
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -252,11 +320,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                               ),
                               Divider(),
                               buildInfoRow("Order ID", orderData!['_id']),
+                              // 👉 Status with color
                               buildInfoRow(
-                                  "Status",
-                                  orderData!['orderStatus']
-                                      .toString()
-                                      .toUpperCase()),
+                                "Status",
+                                orderData!['orderStatus'].toString(),
+                                fontWeight: FontWeight.bold,
+                                valueColor: isCancelled
+                                    ? Colors.deepOrange
+                                    : Colors.black,
+                              ),
+
                               buildInfoRow(
                                   "Date",
                                   DateFormat('MMM dd, yyyy').format(
@@ -267,7 +340,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           ),
                         ),
                       ),
+
                       SizedBox(height: 16),
+
+                      // 🚀 Customer Info Card
                       Card(
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -297,7 +373,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           ),
                         ),
                       ),
+
                       SizedBox(height: 16),
+
+                      // 🚀 Ordered Products List
                       Text("Ordered Products",
                           style: TextStyle(
                               fontSize: 20,
@@ -330,26 +409,61 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           ),
                         );
                       }).toList(),
+
                       const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: ElevatedButton.icon(
-                          onPressed: showCancelReasonSheet,
-                          icon: const Icon(Icons.cancel, color: Colors.white),
-                          label: const Text(
-                            "Cancel Order",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red[600],
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
+
+                      // 🚀 If not cancelled, show "Cancel Order" button
+                      if (!isCancelled)
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: ElevatedButton.icon(
+                            onPressed: showCancelReasonSheet,
+                            icon: const Icon(Icons.cancel, color: Colors.white),
+                            label: const Text(
+                              "Cancel Order",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red[600],
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+
+                      // 🚀 If cancelled, show "Check Refund Status" button
+                      if (isCancelled) ...[
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              // TODO: implement refund status check
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text('Checking refund status...')),
+                              );
+                              _checkRefundStatus(context, orderData!['_id']);
+                            },
+                            icon: const Icon(Icons.money, color: Colors.white),
+                            label: const Text(
+                              "Check Refund Status",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[700],
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 10),
                     ],
                   ),
@@ -357,18 +471,32 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Widget buildInfoRow(String label, String value) {
+  Widget buildInfoRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    FontWeight fontWeight = FontWeight.normal, // optional with default
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-              width: 100,
-              child: Text("$label:",
-                  style: TextStyle(fontWeight: FontWeight.w500))),
+            width: 100,
+            child: Text(
+              "$label:",
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
           Expanded(
-            child: Text(value, style: TextStyle(color: Colors.grey[800])),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: valueColor ?? Colors.grey[800],
+                fontWeight: fontWeight, // ✅ Apply it here
+              ),
+            ),
           ),
         ],
       ),

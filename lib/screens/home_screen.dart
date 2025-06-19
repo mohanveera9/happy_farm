@@ -262,15 +262,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Center: Icon + Text
               Row(
-                children: const [
-                  Icon(Icons.agriculture, color: Color(0xFF4CAF50)),
-                  SizedBox(width: 6),
-                  Text(
-                    'SabbaFarm',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
+                children: [
+                  Image.asset(
+                    'assets/images/sabba krish logo.png',
+                    width: 140,
+                    height: 70,
                   ),
                 ],
               ),
@@ -329,7 +325,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return const ShimmerHomeScreen();
   }
 
-  
   Widget _buildBodyContent() {
     switch (_currentPage) {
       case HomePageView.menu:

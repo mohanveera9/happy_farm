@@ -45,7 +45,7 @@ class ContactScreen extends StatelessWidget {
           children: [
             _buildCardTile(
               context,
-              iconWidget: Brand(Brands.phone, size: 24),
+              iconWidget: Icon(Bootstrap.telephone, size: 24,),
               title: "Missed Call To Order",
               subtitle: "Call us directly to place an order",
               actionLabel: "9866113858",
@@ -53,7 +53,7 @@ class ContactScreen extends StatelessWidget {
             ),
             _buildCardTile(
               context,
-              iconWidget: Brand(Brands.whatsapp, size: 24),
+              iconWidget: Icon(Bootstrap.whatsapp, size: 24,),
               title: "Whatsapp Number",
               subtitle: "Contact through message in WhatsApp",
               actionLabel: "9171749999",
@@ -61,7 +61,7 @@ class ContactScreen extends StatelessWidget {
             ),
             _buildCardTile(
               context,
-              iconWidget: Brand(Brands.google_maps, size: 24),
+              iconWidget: Icon(Icons.map, size: 24),
               title: "Company",
               subtitle: "Sri Santhosh Sowjanya Agencies (SabbaFarm)",
               actionLabel: "Since 2006",
@@ -159,7 +159,7 @@ class ContactScreen extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             _buildSocialButton(
-              icon: Brands.whatsapp,
+              icon: Bootstrap.whatsapp,
               isBrandIcon: true,
               color: AppTheme.primaryColor,
               onTap: () => _launchWhatsApp("9171749999"),
@@ -185,7 +185,7 @@ class ContactScreen extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: isBrandIcon
-            ? Brand(icon, size: 24)
+            ? Icon(icon, size: 24)
             : Icon(icon as IconData, color: Colors.white, size: 24),
       ),
     );

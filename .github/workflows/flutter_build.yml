@@ -25,6 +25,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Ensure Android SDK 34 is available
+        run: |
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
+          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
       - name: Build release APK
         run: flutter build apk --release
 
@@ -36,7 +41,7 @@ jobs:
           body: |
             🎉 A new version of Happy Farm has been released!
 
-            ✅ Built with Flutter 3.22.1 (Dart 3.6.2)
+            ✅ Built with Flutter 3.22.1 (Dart 3.4.1)
             📱 APK is attached below.
 
             👉 Let us know your feedback!

@@ -9,7 +9,7 @@ android {
     namespace = "com.example.happy_farm"
 
     // ✅ Set compile SDK version to Android 14
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -24,7 +24,7 @@ android {
     defaultConfig {
         applicationId = "com.example.happy_farm"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        targetSdk = 35
 
         // ✅ You can update these for CI/CD automation later
         versionCode = 1

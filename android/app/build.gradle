@@ -1,14 +1,14 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    // Flutter plugin must come after Android and Kotlin
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-android {
-    namespace = "com.example.happy_farm"
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(rootProject.file("key.properties")))
 
-    // ✅ Set compile SDK version to Android 14
+android {
+    namespace = "app.sabba.farm"
     compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
@@ -22,21 +22,33 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.happy_farm"
+        applicationId "app.sabba.farm"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.1"
+    }
 
-        // ✅ You can update these for CI/CD automation later
-        versionCode = 1
-        versionName = "1.0.0"
+    signingConfigs {
+        release {
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    aaptOptions {
+        noCompress 'svg', 'ttf'
     }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:happy_farm/models/user_provider.dart';
 import 'package:happy_farm/presentation/main_screens/profile/services/address_service.dart';
 import 'package:happy_farm/utils/app_theme.dart';
+import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:location/location.dart' as loc;
 import 'package:geocoding/geocoding.dart';
 import 'package:provider/provider.dart';
@@ -31,6 +32,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   String _addressType = 'home';
   bool _isDefault = false;
   bool _isLocating = false;
+  bool _issavingaddress = false;
 
   @override
   void initState() {
@@ -76,6 +78,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   Future<void> _saveAddress() async {
+    setState(() => _issavingaddress = true);
     if (_formKey.currentState!.validate()) {
       final addressService = AddressService();
 
@@ -95,23 +98,20 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       print('result:$result');
       if (result != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Address created successfully!')),
-        );
-        Navigator.pop(context);
+        showSuccessSnackbar(context, "Address created successfully!");
+         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create address')),
-        );
+        showErrorSnackbar(context, "Failed to create address!");
+         Navigator.pop(context);
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
-      );
+        showErrorSnackbar(context, "Please fill all required fields");
+         Navigator.pop(context);
     }
   }
 
   Future<void> _updateAddress() async {
+    setState(() => _issavingaddress = true);
     if (_formKey.currentState!.validate()) {
       final addressService = AddressService();
 
@@ -132,19 +132,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       print('update result: $result');
       if (result != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Address updated successfully!')),
-        );
-        Navigator.pop(context);
+        showSuccessSnackbar(context,"Address updated successfully!");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update address')),
-        );
+        showErrorSnackbar(context, "Failed to update address!");
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
-      );
+        showErrorSnackbar(context,  "Please fill all required fields");
     }
   }
 
@@ -418,9 +411,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: widget.existingAddress == null
-                          ? _saveAddress
-                          : _updateAddress,
+                      onPressed: _issavingaddress
+                          ? null // disable button while loading
+                          : widget.existingAddress == null
+                              ? _saveAddress
+                              : _updateAddress,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -428,13 +423,34 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(
-                        widget.existingAddress == null
-                            ? 'SAVE ADDRESS'
-                            : 'UPDATE ADDRESS',
-                        style:
-                            const TextStyle(fontSize: 16, color: Colors.white),
-                      ),
+                      child: _issavingaddress
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  "Loading...",
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.white),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              widget.existingAddress == null
+                                  ? 'SAVE ADDRESS'
+                                  : 'UPDATE ADDRESS',
+                              style: const TextStyle(
+                                  fontSize: 16, color: Colors.white),
+                            ),
                     ),
                   ),
                 ],

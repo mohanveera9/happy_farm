@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:happy_farm/models/user_provider.dart';
+import 'package:happy_farm/presentation/auth/widgets/custom_snackba_msg.dart';
 import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart';
+import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart';
 import 'package:happy_farm/presentation/main_screens/profile/views/addAddressScreen.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/ordersuccesspage.dart';
 import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
 import 'package:happy_farm/presentation/main_screens/profile/services/address_service.dart';
 import 'package:happy_farm/presentation/main_screens/orders/services/order_service.dart';
+import 'package:happy_farm/presentation/main_screens/profile/widgets/custom_dialog.dart';
 import 'package:happy_farm/utils/app_theme.dart';
+import 'package:happy_farm/widgets/custom_snackbar.dart';
+import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,7 +35,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _addressService = AddressService();
   bool _isLoading = false;
   late Razorpay _razorpay;
-
+  String? _selectedAddressId;
+  String? _defaultAddressLoadingId;
   List<dynamic> _addresses = [];
   dynamic _selectedAddress;
   bool _isLoadingAddresses = false;
@@ -55,6 +62,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
+  Future<bool> _showDeleteDialog() async {
+    bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // prevent dismissing by tapping outside
+      builder: (ctx) {
+        return CustomConfirmDialog(
+          title: 'Delete Address?',
+          message: 'This action cannot be undone.',
+          msg1: 'Cancel',
+          msg2: 'Delete',
+          onNo: () => Navigator.of(ctx).pop(false),
+          onYes: () => Navigator.of(ctx).pop(true),
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     userId = prefs.getString('userId');
@@ -71,19 +97,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _addresses = data?['addresses'] ?? [];
         if (_addresses.isNotEmpty) {
-          _selectedAddress = _addresses.first;
+          // Find the default address
+          final defaultAddr = _addresses.firstWhere(
+            (a) => a['isDefault'] == true,
+            orElse: () => _addresses.first,
+          );
+
+          _selectedAddress = defaultAddr;
+          _selectedAddressId = defaultAddr['_id'];
         }
+
         _isLoadingAddresses = false;
       });
     }
   }
-  void _setLoading(bool value) {
-  if (!mounted) return;
-  setState(() => _isLoading = value);
-}
 
+  void _setLoading(bool value) {
+    if (!mounted) return;
+    setState(() => _isLoading = value);
+  }
+
+  void _showLoader() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54, // dim backdrop
+      builder: (_) => const Center(
+        child: SizedBox(
+          width: 80,
+          height: 80,
+          child: Card(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12))),
+            elevation: 6,
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _hideLoader() {
+    if (Navigator.canPop(context)) Navigator.pop(context);
+  }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    _showLoader();
     final verified = await _orderService.verifyPayment(
       razorpayOrderId: response.orderId!,
       razorpayPaymentId: response.paymentId!,
@@ -92,27 +154,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     if (!mounted) return;
-
+    _hideLoader();
     if (verified) {
       await CartService.clearCart();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placed successfully!')),
-      );
+      CustomSnackbar.showSuccess(
+          context, "Success", "Order placed successfully!");
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => OrderSuccessPage()),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment verification failed')),
-      );
+      CustomSnackbar.showError(context, "Error", 'Payment verification failed');
+      _loadUserData();
+      _fetchUserAddresses();
+      _isLoading = false;
     }
   }
 
-  void _handlePaymentError(PaymentFailureResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment failed: ${response.message}')),
-    );
+  Future<void> _handlePaymentError(PaymentFailureResponse response) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId=prefs.getString('userId');
+    CustomSnackbar.showError(
+        context, "Error", 'Payment failed:Please try again later');
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => CartScreen()),
+    );    
+    _loadUserData();
+    _fetchUserAddresses();
+    _isLoading = false;
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {}
@@ -120,10 +190,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _orderIdFromBackend;
 
   Future<void> _submitOrder() async {
-  _setLoading(true);    if (_selectedAddress == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery address')),
-      );
+    _setLoading(true);
+    if (_selectedAddress == null) {
+      CustomSnackbar.showError(
+          context, "Error", 'Please select a delivery address');
       return;
     }
     final orderResponse = await _orderService.createOrder(
@@ -136,7 +206,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (orderResponse != null) {
       final orderData = orderResponse['data'];
-
+      print('manoj$orderResponse');
       _orderIdFromBackend = orderData['paymentHistoryId'];
 
       var options = {
@@ -160,10 +230,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         debugPrint('Error opening Razorpay: $e');
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to create order')),
-      );
+      CustomSnackbar.showError(
+          context, "Error", 'Failed to create order! Please try again later');
     }
+    _loadUserData();
+    _fetchUserAddresses();
+    _isLoading = false;
   }
 
   @override
@@ -211,15 +283,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Select Delivery Address",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 18),
         _addresses.isEmpty
             ? const Text('No saved addresses. Please add a new address.')
             : ListView.builder(
@@ -228,129 +292,239 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 itemCount: _addresses.length,
                 itemBuilder: (context, index) {
                   final address = _addresses[index];
-                  final isSelected = _selectedAddress == address;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedAddress = address;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
+                  final id = address['_id'] as String;
+                  final bool isDefault = address['isDefault'] == true;
+                  final bool isSelected = _selectedAddressId == id;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.green.shade50 : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
                         color: isSelected
-                            ? Colors.green.shade50
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? Colors.green.shade700
-                              : Colors.grey.shade300,
-                          width: isSelected ? 2 : 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
+                            ? AppTheme.primaryColor
+                            : Colors.grey.shade300,
+                        width: isSelected ? 2.0 : 1.2,
                       ),
-                      child: Stack(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(.04),
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        setState(() {
+                          _selectedAddress = address;
+                          _selectedAddressId = id;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Icon(
-                                  isSelected
-                                      ? Icons.check_circle_rounded
-                                      : Icons.radio_button_unchecked,
-                                  color: isSelected
-                                      ? Colors.green.shade700
-                                      : Colors.grey.shade500,
-                                  size: 24,
+                                Row(
+                                  children: [
+                                    Icon(
+                                      address['addressType']?.toLowerCase() ==
+                                              'home'
+                                          ? Icons.home
+                                          : address['addressType']
+                                                      ?.toLowerCase() ==
+                                                  'work'
+                                              ? Icons.work
+                                              : Icons.location_on_outlined,
+                                      size: 25,
+                                      color: Colors.black54,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      (address['addressType'] ?? 'Home')
+                                          .toString(),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        address['name'] ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        '${address['address']}, ${address['city']}, ${address['state']} - ${address['pincode']}',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade700,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                      if ((address['landmark'] ?? '')
-                                          .isNotEmpty)
-                                        Text(
-                                          'Landmark: ${address['landmark']}',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade600,
+                                Row(
+                                  children: [
+                                    isDefault
+                                        ? OutlinedButton.icon(
+                                            onPressed: null, // disabled
+                                            icon: Icon(Icons.check_circle,
+                                                color: Colors.blue.shade600,
+                                                size: 16),
+                                            label: const Text(
+                                              "Default",
+                                              style: TextStyle(
+                                                color: Color(
+                                                    0xFF025192), // Same as your custom blue tone
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              disabledForegroundColor:
+                                                  Colors.blue.shade600,
+                                              side: BorderSide(
+                                                  color: Colors.blue.shade300),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 6,
+                                                      horizontal: 12),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              backgroundColor:
+                                                  Colors.blue.shade50,
+                                            ),
+                                          )
+                                        : OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: Colors.blue,
+                                              side: const BorderSide(
+                                                  color: Colors.blue),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 6,
+                                                      horizontal: 12),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                            ),
+                                            onPressed:
+                                                _defaultAddressLoadingId == id
+                                                    ? null
+                                                    : () async {
+                                                        setState(() =>
+                                                            _defaultAddressLoadingId =
+                                                                id);
+                                                        final res =
+                                                            await _addressService
+                                                                .setDefaultAddress(
+                                                                    id);
+                                                        if (!mounted) return;
+                                                        setState(() =>
+                                                            _defaultAddressLoadingId =
+                                                                null);
+                                                        if (res['success']) {
+                                                          showSuccessSnackbar(
+                                                              context,
+                                                              res['message']);
+                                                          _fetchUserAddresses();
+                                                        } else {
+                                                          showErrorSnackbar(
+                                                              context,
+                                                              res['message']);
+                                                        }
+                                                      },
+                                            child: _defaultAddressLoadingId ==
+                                                    id
+                                                ? Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: const [
+                                                      SizedBox(
+                                                          width: 14,
+                                                          height: 14,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2)),
+                                                      SizedBox(width: 6),
+                                                      Text('Setting...',
+                                                          style: TextStyle(
+                                                              fontSize: 13)),
+                                                    ],
+                                                  )
+                                                : const Text('Set As Default',
+                                                    style: TextStyle(
+                                                        fontSize: 13)),
                                           ),
-                                        ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        '${address['phoneNumber']}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                      Text(
-                                        ' ${address['email']}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    const SizedBox(width: 8),
+                                    _squareIconButton(
+                                      icon: Icons.edit,
+                                      bgColor: Colors.green,
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => AddAddressScreen(
+                                                existingAddress: address),
+                                          ),
+                                        );
+                                        _fetchUserAddresses();
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _squareIconButton(
+                                      icon: Icons.delete,
+                                      bgColor: Colors.red,
+                                      onTap: () async {
+                                        final confirm =
+                                            await _showDeleteDialog();
+                                        if (!confirm) return;
+                                        final res = await _addressService
+                                            .deleteAddress(id);
+                                        if (res['success']) {
+                                          _fetchUserAddresses();
+                                          showSuccessSnackbar(
+                                              context, res['message']);
+                                        } else {
+                                          showSuccessSnackbar(
+                                              context, res['message']);
+                                        }
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: IconButton(
-                              icon: Icon(
-                                Icons.edit,
-                                color: Colors.grey.shade600,
-                                size: 22,
-                              ),
-                              onPressed: () async {
-                                // Open edit address screen
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AddAddressScreen(
-                                      existingAddress: address, // pass this
-                                    ),
-                                  ),
-                                );
-                                _fetchUserAddresses(); // reload after edit
-                              },
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(address['name'] ?? '',
+                                      style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                                Text(address['phoneNumber'] ?? '',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade700)),
+                              ],
                             ),
-                          ),
-                        ],
+                            if ((address['email'] ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(address['email'],
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontStyle: FontStyle.italic,
+                                      color: Colors.black54)),
+                            ],
+                            const SizedBox(height: 6),
+                            Text(address['address'] ?? '',
+                                style: const TextStyle(fontSize: 14)),
+                            Text(
+                              '${address['city']}, ${address['state']} - ${address['pincode']}',
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -371,21 +545,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               );
               _fetchUserAddresses();
             },
-            icon: const Icon(Icons.add_location_alt),
+            icon: const Icon(Icons.add_location_alt, size: 20),
             label: const Text(
               "Add New Address",
-              style: TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             style: ElevatedButton.styleFrom(
+              elevation: 3,
               backgroundColor: AppTheme.primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _squareIconButton({
+    required IconData icon,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
     );
   }
 
@@ -413,7 +609,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             icon: const Icon(Icons.add),
             label: const Text("Add New Address"),
             style: ElevatedButton.styleFrom(
-              backgroundColor:AppTheme.primaryColor,
+              backgroundColor: AppTheme.primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
             ),
           ),

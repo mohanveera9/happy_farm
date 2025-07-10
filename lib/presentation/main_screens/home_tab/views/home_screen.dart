@@ -1,16 +1,19 @@
 import 'dart:async';
-import 'package:happy_farm/presentation/main_screens/main_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:happy_farm/presentation/auth/views/welcome_screen.dart';
 import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/banner_service.dart';
 import 'package:flutter/material.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/views/filter_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filtered_products_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
 import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/widgets/shimmer_widget.dart';
+import 'package:happy_farm/presentation/main_screens/profile/widgets/custom_dialog.dart';
+import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/product_model.dart'
-;
+import '../models/product_model.dart';
 import '../widgets/product_card.dart';
 import '../models/banner_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/category_service.dart';
@@ -36,8 +39,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onCloseMenu() {
     setState(() {
+      selectedCatId = '';
       _currentPage = HomePageView.home;
+      _filteredProducts = [];
     });
+  }
+
+  void _showLoader() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (_) => const Center(
+        child: SizedBox(
+          width: 80,
+          height: 80,
+          child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(
+                Radius.circular(12),
+              ),
+            ),
+            elevation: 6,
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _hideLoader() {
+    if (Navigator.canPop(context)) Navigator.pop(context);
   }
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -59,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int filteredminPrice = 0;
   int filteredmaxPrice = 60000;
   int filteredrating = 0;
+
   @override
   void initState() {
     super.initState();
@@ -102,16 +138,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchProductsByRating({
-    int? rating,
+    required int rating,
+    required String categoryId,
+    required String categoryName,
   }) async {
     setState(() {
       _isLoading = true;
     });
-    filteredCategoryName = selectedCatName;
-    filteredrating = rating!;
+    _showLoader();
+
+    filteredCategoryName = categoryName;
+    filteredrating = rating;
+
     try {
       final products = await _productService.getProductsByRating(
-        catId: selectedCatId,
+        catId: categoryId,
         rating: rating,
       );
       if (products.isNotEmpty) {
@@ -120,22 +161,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _currentPage = HomePageView.filtered;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No filtered products found.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showErrorSnackbar(context, 'No filtered products found.');
       }
     } catch (e) {
-      debugPrint('Error fetching filtered products: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showErrorSnackbar(context, '$e');
     } finally {
+      _hideLoader();
       setState(() {
         _isLoading = false;
       });
@@ -143,18 +174,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchProductsByPrice({
-    int? minPrice,
-    int? maxPrice,
+    required int minPrice,
+    required int maxPrice,
+    required String categoryId,
+    required String categoryName,
   }) async {
     setState(() {
       _isLoading = true;
     });
-    filteredCategoryName = selectedCatName;
-    filteredmaxPrice = maxPrice!;
-    filteredminPrice = minPrice!;
+    _showLoader();
+
+    filteredCategoryName = categoryName;
+    filteredmaxPrice = maxPrice;
+    filteredminPrice = minPrice;
+
     try {
       final products = await _productService.filterByPrice(
-        catId: selectedCatId,
+        catId: categoryId,
         minPrice: minPrice,
         maxPrice: maxPrice,
       );
@@ -164,22 +200,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _currentPage = HomePageView.filtered;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No filtered products found.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showErrorSnackbar(context, 'No filtered products found.');
       }
     } catch (e) {
-      debugPrint('Error fetching filtered products: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showErrorSnackbar(context, '$e');
     } finally {
+      _hideLoader();
       setState(() {
         _isLoading = false;
       });
@@ -202,16 +228,20 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isLoading = true;
     });
-    filteredCategoryName=catName;
+    _showLoader();
+
+    filteredCategoryName = catName;
+
     try {
       final products = await _productService.getProductsByCatName(catName);
       setState(() {
         _filteredProducts = products;
-         _currentPage = HomePageView.filtered;
+        _currentPage = HomePageView.filtered;
       });
     } catch (e) {
       debugPrint('Error fetching category products: $e');
     } finally {
+      _hideLoader();
       setState(() {
         _isLoading = false;
       });
@@ -234,19 +264,33 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // Navigate to MainScreen instead of going back
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-          (route) => false, // remove all previous routes
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => CustomConfirmDialog(
+            title: "Are you sure?",
+            message: "Do you really want to exit the app?",
+            onYes: () {
+              Navigator.of(context).pop(true);
+            },
+            onNo: () {
+              Navigator.of(context).pop(false);
+            },
+            msg1: 'Cancel',
+            msg2: 'Exit',
+          ),
         );
-        return false; // prevent default back behavior
+
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+
+        return false;
       },
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
           backgroundColor: Colors.white,
-          elevation: 1, // Small shadow to separate AppBar from body
+          elevation: 1,
           automaticallyImplyLeading: false,
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -254,23 +298,36 @@ class _HomeScreenState extends State<HomeScreen> {
               // Left: Menu or Close
               IconButton(
                 icon: Icon(
-                  _currentPage == HomePageView.menu ? Icons.close : Icons.menu,
+                  (_currentPage == HomePageView.menu ||
+                          _currentPage == HomePageView.filtered)
+                      ? Icons.close
+                      : Icons.filter_list,
                   color: Colors.black87,
                 ),
-                onPressed: _currentPage == HomePageView.menu
+                onPressed: (_currentPage == HomePageView.menu ||
+                        _currentPage == HomePageView.filtered)
                     ? _onCloseMenu
                     : _onMenuTap,
               ),
 
               // Center: Icon + Text
-              Row(
-                children: [
-                  Image.asset(
-                    'assets/images/sabba krish logo.png',
-                    width: 140,
-                    height: 70,
-                  ),
-                ],
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (builder) => WelcomeScreen(),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    Image.asset(
+                      'assets/images/sabba krish logo.png',
+                      width: 140,
+                      height: 70,
+                    ),
+                  ],
+                ),
               ),
 
               // Right: Cart Icon with badge
@@ -283,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CartScreen(userId: userId!),
+                          builder: (context) => CartScreen(),
                         ),
                       );
                     },
@@ -330,7 +387,34 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBodyContent() {
     switch (_currentPage) {
       case HomePageView.menu:
-        return _buildFilterScreen();
+        return FilterScreen(
+          categories: _categories,
+          onCategorySelected: (categoryId, categoryName) {
+            selectedCatId = categoryId;
+            selectedCatName = categoryName;
+          },
+          onPriceFilter: (minPrice, maxPrice) {
+            _fetchProductsByPrice(
+              minPrice: minPrice,
+              maxPrice: maxPrice,
+              categoryId: selectedCatId,
+              categoryName: selectedCatName,
+            );
+          },
+          onRatingFilter: (rating) {
+            _fetchProductsByRating(
+              rating: rating,
+              categoryId: selectedCatId,
+              categoryName: selectedCatName,
+            );
+          },
+          onApplyFilters: () {
+            if (selectedCatId.isNotEmpty) {
+              _fetchProductsByCategory(selectedCatName);
+            }
+          },
+          onClose: _onCloseMenu,
+        );
       case HomePageView.home:
         return _isLoading
             ? _buildLoadingView()
@@ -347,281 +431,6 @@ class _HomeScreenState extends State<HomeScreen> {
           rating: filteredrating,
         );
     }
-  }
-
-  Widget _buildFilterScreen() {
-    RangeValues _priceRange = const RangeValues(1, 60000);
-    double _minPrice = 1;
-    double _maxPrice = 60000;
-    int _selectedRating = 0;
-
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          color: Colors.white,
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Filter",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-
-                // Selected Filters Summary
-                if (selectedCatId.isNotEmpty ||
-                    _priceRange.start.round() != _minPrice.toInt() ||
-                    _priceRange.end.round() != _maxPrice.toInt() ||
-                    _selectedRating > 0)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (selectedCatId.isNotEmpty)
-                        Chip(
-                          label: Text(
-                            selectedCatName,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          backgroundColor: Colors.blue.shade50,
-                          avatar:
-                              const Icon(Icons.category, color: Colors.blue),
-                        ),
-                      if (_priceRange.start.round() != _minPrice.toInt() ||
-                          _priceRange.end.round() != _maxPrice.toInt())
-                        Chip(
-                          label: Text(
-                            '₹${_priceRange.start.round()} - ₹${_priceRange.end.round()}',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          backgroundColor: Colors.green.shade50,
-                          avatar: const Icon(Icons.price_change,
-                              color: Colors.green),
-                        ),
-                      if (_selectedRating > 0)
-                        Chip(
-                          label: Text(
-                            '$_selectedRating ★ & up',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          backgroundColor: Colors.orange.shade50,
-                          avatar: const Icon(Icons.star, color: Colors.orange),
-                        ),
-                    ],
-                  ),
-
-                const SizedBox(height: 20),
-
-                // CATEGORY FILTER
-                const Text(
-                  "FILTER BY CATEGORY",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                _categories.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
-                    : Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                        child: SizedBox(
-                          height: 120,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _categories.length,
-                            itemBuilder: (context, index) {
-                              final category = _categories[index];
-                              final isSelected = category.id == selectedCatId;
-
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    selectedCatId = category.id;
-                                    selectedCatName = category.name;
-                                  });
-                                },
-                                child: Container(
-                                  width: 100,
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 8.0),
-                                  child: Column(
-                                    children: [
-                                      Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          Container(
-                                            height: 70,
-                                            width: 70,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              image: DecorationImage(
-                                                image: NetworkImage(
-                                                    category.imageUrl),
-                                                fit: BoxFit.cover,
-                                                colorFilter: isSelected
-                                                    ? ColorFilter.mode(
-                                                        Colors.blue
-                                                            .withOpacity(0.6),
-                                                        BlendMode.srcATop,
-                                                      )
-                                                    : null,
-                                              ),
-                                              border: Border.all(
-                                                color: isSelected
-                                                    ? Colors.blue
-                                                    : Colors.transparent,
-                                                width: 2,
-                                              ),
-                                            ),
-                                          ),
-                                          if (isSelected)
-                                            const Icon(
-                                              Icons.check_circle,
-                                              color: Colors.white,
-                                              size: 30,
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        category.name,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-
-                const SizedBox(height: 30),
-
-                // PRICE FILTER
-                const Text(
-                  "FILTER BY PRICE",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                RangeSlider(
-                  values: _priceRange,
-                  min: _minPrice,
-                  max: _maxPrice,
-                  divisions: (_maxPrice - _minPrice).toInt(),
-                  activeColor: Colors.green,
-                  inactiveColor: Colors.green.shade100,
-                  labels: RangeLabels(
-                    'Rs: ${_priceRange.start.round()}',
-                    'Rs: ${_priceRange.end.round()}',
-                  ),
-                  onChanged: (RangeValues values) {
-                    setState(() {
-                      _priceRange = values;
-                    });
-                  },
-                  onChangeEnd: (RangeValues values) {
-                    Future.delayed(const Duration(milliseconds: 2000), () {
-                      if (selectedCatId.isNotEmpty) {
-                        _fetchProductsByPrice(
-                          minPrice: values.start.round(),
-                          maxPrice: values.end.round(),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Please select a category first.')),
-                        );
-                      }
-                    });
-                  },
-                ),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'From: Rs: ${_priceRange.start.round()}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    Text(
-                      'To: Rs: ${_priceRange.end.round()}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                // RATING FILTER
-                const Text(
-                  "FILTER BY RATING",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Column(
-                  children: List.generate(5, (index) {
-                    int stars = 5 - index;
-                    bool isSelected = _selectedRating == stars;
-
-                    return InkWell(
-                      onTap: () {
-                        if (selectedCatId.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text('Please select a category first.')),
-                          );
-                          return;
-                        }
-
-                        setState(() {
-                          _selectedRating = stars;
-                        });
-
-                        _fetchProductsByRating(rating: _selectedRating);
-
-                        Future.delayed(const Duration(seconds: 2), () {
-                          if (mounted) {
-                            setState(() {
-                              _selectedRating = 0;
-                            });
-                          }
-                        });
-                      },
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: List.generate(5, (i) {
-                              return Icon(
-                                i < stars ? Icons.star : Icons.star_border,
-                                color: i < stars ? Colors.orange : Colors.grey,
-                                size: 28,
-                              );
-                            }),
-                          ),
-                          if (isSelected)
-                            const Icon(
-                              Icons.check_circle,
-                              color: Colors.blue,
-                            ),
-                        ],
-                      ),
-                    );
-                  }),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Widget _buildContentView() {
@@ -645,40 +454,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-
-        // Overlay full screen filtered products view (except appbar/bottom nav)
-        if (_filteredProducts.isNotEmpty)
-          Positioned.fill(
-            child: Container(
-              color: Colors.white, // Background for clarity
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12.0, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Filtered Products",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _filteredProducts = [];
-                            });
-                          },
-                          child: const Text("Clear"),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -743,7 +518,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final visibleProducts =
-        _featuredProducts.take(_visibleFeaturedCount).toList();
+        _featuredProducts.reversed.take(_visibleFeaturedCount).toList();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    final crossAxisCount = isTablet ? 3 : 2;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
@@ -752,11 +531,11 @@ class _HomeScreenState extends State<HomeScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 2,
-              mainAxisSpacing: 2,
-              childAspectRatio: 0.60,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 5,
+              mainAxisSpacing: 5,
+              childAspectRatio: 0.75, // Fixed optimal ratio
             ),
             itemCount: visibleProducts.length,
             itemBuilder: (context, index) {
@@ -799,8 +578,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: Text('No products available.'));
     }
 
-    final visibleProducts = _allProducts.take(_visibleAllCount).toList();
+    final visibleProducts =
+        _allProducts.reversed.take(_visibleAllCount).toList();
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    final crossAxisCount = isTablet ? 3 : 2;
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
@@ -813,10 +596,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
-                    childAspectRatio: 0.60,
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    childAspectRatio: 0.75, // Fixed optimal ratio
                   ),
                   itemCount: visibleProducts.length,
                   itemBuilder: (context, index) {

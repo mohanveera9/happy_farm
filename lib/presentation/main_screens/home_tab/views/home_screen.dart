@@ -1,36 +1,49 @@
-// Updated HomeScreen with AutomaticKeepAliveClientMixin to persist data
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/shimmer_widget.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/featured_categorie_widget.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:happy_farm/presentation/auth/views/welcome_screen.dart';
-import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filter_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filtered_products_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
-import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/widgets/auto_scroll_banner_widget.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/widgets/shimmer_widget.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/widgets/all_products_widget.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/widgets/featured_products_widget.dart';
 import 'package:happy_farm/presentation/main_screens/profile/widgets/custom_dialog.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product_model.dart';
-import '../models/banner_model.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/services/category_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/product_service.dart';
 
 enum HomePageView { home, menu, filtered }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final List<CategoryModel> categories;
+  final String? userId;
+  final int cartItemCount;
+  final Future<void> Function()? onRefresh;
+  final bool isLoading;
+  final bool isCartCountLoading;
+  final Future<void> Function()? onCartChanged;
+
+  const HomeScreen({
+    Key? key,
+    required this.categories,
+    required this.userId,
+    required this.cartItemCount,
+    this.onRefresh,
+    this.isLoading = false,
+    this.isCartCountLoading = false,
+    this.onCartChanged,
+  }) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true; // This keeps the state alive
 
@@ -81,24 +94,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _isLoading = true;
-  List<CategoryModel> _categories = [];
   List<FilterProducts> _filteredProducts = [];
   String selectedCatId = '';
   String selectedCatName = '';
   bool isSearch = false;
   final _productService = ProductService();
   bool isLoadingSearch = false;
-  String? userId;
-  int cartItemCount = 0;
   String filteredCategoryName = '';
   int? filteredminPrice;
   int? filteredmaxPrice;
   int? filteredrating;
   bool isCartCountLoading = false;
-
-  // Flag to track if data has been loaded initially
-  bool _hasInitialDataLoaded = false;
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<State<StatefulWidget>> _allProductsKey =
@@ -108,24 +114,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   final GlobalKey<State<StatefulWidget>> _bannerKey =
       GlobalKey<State<StatefulWidget>>();
 
+  // Add these to prevent rebuilding home content
+  late Widget _homeContent;
+  bool _isHomeContentInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    _initializeData();
-  }
-
-  // Initialize data only once
-  Future<void> _initializeData() async {
-    if (!_hasInitialDataLoaded) {
-      await fetchCategories();
-      await _loadUser();
-      await loadCartItemCount();
-      
-      setState(() {
-        _hasInitialDataLoaded = true;
-        _isLoading = false;
-      });
-    }
   }
 
   @override
@@ -134,79 +129,22 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     super.dispose();
   }
 
-  Future<void> _loadUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userId = prefs.getString('userId');
-    });
-  }
-
-  // Load cart count (only called initially and when returning from cart)
-  Future<void> loadCartItemCount() async {
-    try {
-      setState(() {
-        isCartCountLoading = true;
-      });
-
-      final List<CartItem> cartItems = await CartService.fetchCart();
-
-      setState(() {
-        isCartCountLoading = false;
-        cartItemCount = cartItems.length;
-      });
-    } catch (e) {
-      print("Error fetching cart item count: $e");
-      setState(() {
-        isCartCountLoading = false;
-        cartItemCount = 0;
-      });
-    }
-  }
-
-  // Method to refresh only cart count (can be called when user returns to home)
-  Future<void> refreshCartCount() async {
-    await loadCartItemCount();
-  }
-
-  // Navigate to cart screen and handle return
   Future<void> _navigateToCartScreen() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CartScreen(),
       ),
     );
-
-    // Only refresh cart count if cart was modified
-    if (result == 'cart_updated' || result == true) {
-      loadCartItemCount();
-    }
   }
 
-  // Navigate to product details screen and handle return
   Future<void> _navigateToProductDetailsScreen(dynamic product) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ProductDetails(product: product),
       ),
     );
-
-    // Only refresh cart count if cart was modified
-    if (result == 'cart_updated_int_product_details' || result == true) {
-      loadCartItemCount();
-    }
-  }
-
-  Future<void> fetchCategories() async {
-    try {
-      final categories = await CategoryService.fetchCategories();
-      setState(() {
-        _categories = categories;
-      });
-    } catch (e) {
-      print('Error loading categories: $e');
-    }
   }
 
   Future<void> _fetchProductsByRating({
@@ -214,9 +152,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required String categoryId,
     required String categoryName,
   }) async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() {});
     _showLoader();
 
     filteredCategoryName = categoryName;
@@ -239,9 +175,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       showErrorSnackbar(context, '$e');
     } finally {
       _hideLoader();
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() {});
     }
   }
 
@@ -251,9 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required String categoryId,
     required String categoryName,
   }) async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() {});
     _showLoader();
 
     filteredCategoryName = categoryName;
@@ -278,16 +210,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       showErrorSnackbar(context, '$e');
     } finally {
       _hideLoader();
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() {});
     }
   }
 
   Future<void> _fetchProductsByCategory(String catName) async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() {});
     _showLoader();
 
     filteredCategoryName = catName;
@@ -302,16 +230,39 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       debugPrint('Error fetching category products: $e');
     } finally {
       _hideLoader();
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() {});
     }
+  }
+
+  Widget _buildHomeContent() {
+    if (!_isHomeContentInitialized || widget.isLoading) {
+      _homeContent = widget.isLoading
+          ? const ShimmerHomeScreen()
+          : RefreshIndicator(
+              onRefresh: () async {
+                // Reset the home content on refresh
+                setState(() {
+                  _isHomeContentInitialized = false;
+                });
+                if (widget.onRefresh != null) {
+                  await widget.onRefresh!();
+                }
+              },
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: _buildContentView(),
+              ),
+            );
+      _isHomeContentInitialized = true;
+    }
+    return _homeContent;
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
+
     return WillPopScope(
       onWillPop: () async {
         final shouldExit = await showDialog<bool>(
@@ -388,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         color: Colors.black87),
                     onPressed: _navigateToCartScreen,
                   ),
-                  if (cartItemCount > 0)
+                  if (widget.cartItemCount > 0)
                     Positioned(
                       right: 6,
                       top: 6,
@@ -400,23 +351,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         ),
                         constraints:
                             const BoxConstraints(minWidth: 20, minHeight: 20),
-                        child: isCartCountLoading
-                            ? SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                '$cartItemCount',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                        child: Text(
+                          '${widget.cartItemCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                 ],
@@ -426,76 +368,62 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         ),
         backgroundColor: const Color(0xFFF5F5F5),
         body: SafeArea(
-          child: _buildBodyContent(),
+          child: IndexedStack(
+            index: _currentPage.index,
+            children: [
+              // Home page (index 0)
+              _buildHomeContent(),
+              // Filter page (index 1)
+              FilterScreen(
+                categories: widget.categories,
+                onCategorySelected: (categoryId, categoryName) {
+                  selectedCatId = categoryId;
+                  selectedCatName = categoryName;
+                },
+                onPriceFilter: (minPrice, maxPrice) {
+                  filteredminPrice = minPrice;
+                  filteredmaxPrice = maxPrice;
+                  filteredrating = null;
+                  _fetchProductsByPrice(
+                    minPrice: minPrice,
+                    maxPrice: maxPrice,
+                    categoryId: selectedCatId,
+                    categoryName: selectedCatName,
+                  );
+                },
+                onRatingFilter: (rating) {
+                  filteredrating = rating;
+                  filteredminPrice = null;
+                  filteredmaxPrice = null;
+                  _fetchProductsByRating(
+                    rating: rating,
+                    categoryId: selectedCatId,
+                    categoryName: selectedCatName,
+                  );
+                },
+                onApplyFilters: () {
+                  if (selectedCatId.isNotEmpty) {
+                    filteredminPrice = null;
+                    filteredmaxPrice = null;
+                    filteredrating = null;
+                    _fetchProductsByCategory(selectedCatName);
+                  }
+                },
+                onClose: _onCloseMenu,
+              ),
+              // Filtered products page (index 2)
+              FilteredProductsScreen(
+                products: _filteredProducts,
+                categoryName: filteredCategoryName,
+                minPrice: filteredminPrice,
+                maxPrice: filteredmaxPrice,
+                rating: filteredrating,
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  Widget _buildLoadingView() {
-    return const ShimmerHomeScreen();
-  }
-
-  Widget _buildBodyContent() {
-    // Show loading only if data hasn't been loaded initially
-    if (!_hasInitialDataLoaded) {
-      return _buildLoadingView();
-    }
-
-    switch (_currentPage) {
-      case HomePageView.menu:
-        return FilterScreen(
-          categories: _categories,
-          onCategorySelected: (categoryId, categoryName) {
-            selectedCatId = categoryId;
-            selectedCatName = categoryName;
-          },
-          onPriceFilter: (minPrice, maxPrice) {
-            filteredminPrice = minPrice;
-            filteredmaxPrice = maxPrice;
-            filteredrating = null;
-            _fetchProductsByPrice(
-              minPrice: minPrice,
-              maxPrice: maxPrice,
-              categoryId: selectedCatId,
-              categoryName: selectedCatName,
-            );
-          },
-          onRatingFilter: (rating) {
-            filteredrating = rating;
-            filteredminPrice = null;
-            filteredmaxPrice = null;
-            _fetchProductsByRating(
-              rating: rating,
-              categoryId: selectedCatId,
-              categoryName: selectedCatName,
-            );
-          },
-          onApplyFilters: () {
-            if (selectedCatId.isNotEmpty) {
-              filteredminPrice = null;
-              filteredmaxPrice = null;
-              filteredrating = null;
-              _fetchProductsByCategory(selectedCatName);
-            }
-          },
-          onClose: _onCloseMenu,
-        );
-      case HomePageView.home:
-        return SingleChildScrollView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: _buildContentView(),
-        );
-      case HomePageView.filtered:
-        return FilteredProductsScreen(
-          products: _filteredProducts,
-          categoryName: filteredCategoryName,
-          minPrice: filteredminPrice,
-          maxPrice: filteredmaxPrice,
-          rating: filteredrating,
-        );
-    }
   }
 
   Widget _buildContentView() {
@@ -508,13 +436,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           autoScrollDuration: const Duration(seconds: 3),
           margin: const EdgeInsets.all(16.0),
           borderRadius: BorderRadius.circular(12.0),
-          onBannerTap: () {
-            // Handle banner tap - navigate to specific screen or show details
-            print('Banner tapped');
-          },
+          onBannerTap: () {},
         ),
         _buildSectionTitle('Featured Categories'),
-        _buildCategorySection(),
+        FeaturedCategoriesWidget(
+          onCategorySelected: (categoryName) {
+            _fetchProductsByCategory(categoryName);
+          },
+        ),
         _buildSectionTitle('Featured Products'),
         FeaturedProductsWidget(
           key: _featuredProductsKey,
@@ -531,69 +460,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         ),
         const SizedBox(height: 20), // Add some bottom padding
       ],
-    );
-  }
-
-  Widget _buildCategorySection() {
-    if (_categories.isEmpty) {
-      return Container(
-        height: 120,
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: SizedBox(
-        height: 120,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          itemCount: _categories.length,
-          itemBuilder: (context, index) {
-            final category = _categories[index];
-            return GestureDetector(
-              onTap: () {
-                _fetchProductsByCategory(category.name);
-              },
-              child: Container(
-                width: 100,
-                margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Column(
-                  children: [
-                    Container(
-                      height: 70,
-                      width: 70,
-                      decoration: BoxDecoration(
-                        color: Color(int.parse(
-                            category.color.replaceFirst('#', '0xff'))),
-                        shape: BoxShape.circle,
-                        border:
-                            Border.all(width: 0, color: Colors.grey.shade300),
-                        image: DecorationImage(
-                          image: NetworkImage(category.imageUrl),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      category.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
     );
   }
 

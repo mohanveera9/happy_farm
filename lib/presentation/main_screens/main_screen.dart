@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/user_provider.dart';
-import 'package:happy_farm/presentation/auth/views/login_screen.dart';
+import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/services/category_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/home_screen.dart';
 import 'package:happy_farm/presentation/main_screens/orders/views/order_screen.dart';
 import 'package:happy_farm/presentation/main_screens/profile/views/profile_screen.dart';
@@ -20,6 +22,55 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  bool _isHomeDataLoading = true;
+  List<CategoryModel> _categories = [];
+  String? _userId;
+  int _cartItemCount = 0;
+  bool _isCartCountLoading = false;
+
+  Future<void> _fetchHomeData() async {
+    setState(() {
+      _isHomeDataLoading = true;
+    });
+    try {
+      final categories = await CategoryService.fetchCategories();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+      setState(() {
+        _categories = categories;
+        _userId = userId;
+      });
+      await _fetchCartCount();
+    } catch (e) {
+    } finally {
+      setState(() {
+        _isHomeDataLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchCartCount() async {
+    setState(() {
+      _isCartCountLoading = true;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+      int cartCount = 0;
+      if (userId != null) {
+        final cartItems = await CartService.fetchCart();
+        cartCount = cartItems.length;
+      }
+      setState(() {
+        _cartItemCount = cartCount;
+      });
+    } catch (e) {
+    } finally {
+      setState(() {
+        _isCartCountLoading = false;
+      });
+    }
+  }
   late int _selectedIndex;
   bool _isCheckingLogin = true;
   bool _isLoggedIn = false;
@@ -29,6 +80,7 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _selectedIndex = widget.selectedIndex;
     _checkLoginStatus();
+    _fetchHomeData();
   }
 
   Future<void> getUser() async {
@@ -57,8 +109,6 @@ class _MainScreenState extends State<MainScreen> {
       _isLoggedIn = token != null && userId != null;
       _isCheckingLogin = false;
     });
-
-    // Only fetch user data if logged in
     if (_isLoggedIn) {
       await getUser();
     }
@@ -71,21 +121,22 @@ class _MainScreenState extends State<MainScreen> {
   }
 
 
-  Widget _getScreen(int index) {
-    switch (index) {
-      case 0:
-        return const HomeScreen();
-      case 1:
-        return const SearchScreen();
-      case 2:
-        return const WishlistScreen() ;
-      case 3:
-        return const OrdersScreen() ;
-      case 4:
-        return const ProfileScreen();
-      default:
-        return const HomeScreen();
-    }
+  List<Widget> get _screens {
+    return [
+      HomeScreen(
+        categories: _categories,
+        userId: _userId,
+        cartItemCount: _cartItemCount,
+        isCartCountLoading: _isCartCountLoading,
+        onRefresh: _fetchHomeData,
+        isLoading: _isHomeDataLoading,
+        onCartChanged: _fetchCartCount,
+      ),
+      const SearchScreen(),
+      const WishlistScreen(),
+      const OrdersScreen(),
+      const ProfileScreen(),
+    ];
   }
 
   @override
@@ -97,7 +148,10 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     return Scaffold(
-      body: _getScreen(_selectedIndex),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Color.fromARGB(255, 56, 142, 60),

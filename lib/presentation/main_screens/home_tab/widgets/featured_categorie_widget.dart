@@ -8,7 +8,6 @@ class FeaturedCategoriesWidget extends StatefulWidget {
   final double categorySize;
   final EdgeInsets? padding;
   final bool showTitle;
-  final String title;
 
   const FeaturedCategoriesWidget({
     Key? key,
@@ -17,11 +16,11 @@ class FeaturedCategoriesWidget extends StatefulWidget {
     this.categorySize = 70.0,
     this.padding,
     this.showTitle = true,
-    this.title = 'Featured Categories',
   }) : super(key: key);
 
   @override
-  State<FeaturedCategoriesWidget> createState() => _FeaturedCategoriesWidgetState();
+  State<FeaturedCategoriesWidget> createState() =>
+      _FeaturedCategoriesWidgetState();
 }
 
 class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
@@ -41,9 +40,9 @@ class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
       });
 
       final categories = await CategoryService.fetchCategories();
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _categories = categories;
         _isLoading = false;
@@ -66,18 +65,6 @@ class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.showTitle)
-          Padding(
-            padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text(
-              widget.title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        
         SizedBox(
           height: widget.height,
           child: _isLoading

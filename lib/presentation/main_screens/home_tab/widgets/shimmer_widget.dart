@@ -239,120 +239,90 @@ class ShimmerHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final gridItemWidth = (screenWidth - 36) / 2; // Accounting for padding and spacing
-    final gridItemHeight = gridItemWidth * 1.54; // Matching aspect ratio in original grid (0.65)
+    final gridItemWidth = (screenWidth - 40) / 2;
+    final gridItemHeight = gridItemWidth * 1.5;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Banner shimmer
-          ShimmerBanner(width: screenWidth, height: 180),
-          
-          // Featured Categories Title
-          const ShimmerSectionTitle(width: 170),
-          
-          // Featured Categories
-          SizedBox(
-            height: 120,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return const ShimmerCategoryItem();
-              },
-            ),
-          ),
-          
-          // Featured Products Title
-          const ShimmerSectionTitle(width: 160),
-          
-          // Featured Products Grid
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 2, // Show 2 featured products initially
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 2,
-                mainAxisSpacing: 2,
-                childAspectRatio: 0.66,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Banner shimmer
+            ShimmerBanner(width: screenWidth, height: 180),
+            const SizedBox(height: 8),
+            // Featured Categories Title
+            const ShimmerSectionTitle(width: 170),
+            // Featured Categories
+            SizedBox(
+              height: 110,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: 5,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return const ShimmerCategoryItem();
+                },
               ),
-              itemBuilder: (context, index) {
-                return ShimmerProductCard(
-                  width: gridItemWidth,
-                  height: gridItemHeight,
-                );
-              },
             ),
-          ),
-          
-          // "View All" button shimmer
-          Center(
-            child: Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(
-                width: 80,
-                height: 20,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4.0),
+            const SizedBox(height: 12),
+            // Featured Products Title
+            const ShimmerSectionTitle(width: 160),
+            // Featured Products Grid
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(2, (index) => ShimmerProductCard(width: gridItemWidth, height: gridItemHeight)),
+              ),
+            ),
+            // "View All" button shimmer
+            Center(
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  width: 90,
+                  height: 22,
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6.0),
+                  ),
                 ),
               ),
             ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // All Products Title
-          const ShimmerSectionTitle(width: 120),
-          
-          // All Products Grid
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 2, // Show 2 products initially
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 2,
-                mainAxisSpacing: 2,
-                childAspectRatio: 0.60,
+            const SizedBox(height: 18),
+            // All Products Title
+            const ShimmerSectionTitle(width: 120),
+            // All Products Grid
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(2, (index) => ShimmerProductCard(width: gridItemWidth, height: gridItemHeight)),
               ),
-              itemBuilder: (context, index) {
-                return ShimmerProductCard(
-                  width: gridItemWidth,
-                  height: gridItemHeight,
-                );
-              },
             ),
-          ),
-          
-          // "View All" button shimmer
-          Center(
-            child: Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(
-                width: 80,
-                height: 20,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4.0),
+            // "View All" button shimmer
+            Center(
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  width: 90,
+                  height: 22,
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6.0),
+                  ),
                 ),
               ),
             ),
-          ),
-          
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }

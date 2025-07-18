@@ -1,20 +1,22 @@
+// Updated HomeScreen with AutomaticKeepAliveClientMixin to persist data
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:happy_farm/presentation/auth/views/welcome_screen.dart';
 import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/services/banner_service.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filter_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filtered_products_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
 import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/auto_scroll_banner_widget.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/widgets/shimmer_widget.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/all_products_widget.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/featured_products_widget.dart';
 import 'package:happy_farm/presentation/main_screens/profile/widgets/custom_dialog.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product_model.dart';
-import '../widgets/product_card.dart';
 import '../models/banner_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/category_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/product_service.dart';
@@ -28,7 +30,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // This keeps the state alive
+
   HomePageView _currentPage = HomePageView.home;
 
   void _onMenuTap() {
@@ -77,12 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isLoading = true;
-  List<FeaturedProduct> _featuredProducts = [];
-  List<AllProduct> _allProducts = [];
   List<CategoryModel> _categories = [];
   List<FilterProducts> _filteredProducts = [];
-  int _visibleFeaturedCount = 2;
-  int _visibleAllCount = 2;
   String selectedCatId = '';
   String selectedCatName = '';
   bool isSearch = false;
@@ -91,18 +92,46 @@ class _HomeScreenState extends State<HomeScreen> {
   String? userId;
   int cartItemCount = 0;
   String filteredCategoryName = '';
-  int filteredminPrice = 0;
-  int filteredmaxPrice = 60000;
-  int filteredrating = 0;
+  int? filteredminPrice;
+  int? filteredmaxPrice;
+  int? filteredrating;
+  bool isCartCountLoading = false;
+
+  // Flag to track if data has been loaded initially
+  bool _hasInitialDataLoaded = false;
+
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<State<StatefulWidget>> _allProductsKey =
+      GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _featuredProductsKey =
+      GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _bannerKey =
+      GlobalKey<State<StatefulWidget>>();
 
   @override
   void initState() {
     super.initState();
-    fetchAllProducts();
-    fetchFeaturedProducts();
-    fetchCategories();
-    _loadUser();
-    loadCartItemCount();
+    _initializeData();
+  }
+
+  // Initialize data only once
+  Future<void> _initializeData() async {
+    if (!_hasInitialDataLoaded) {
+      await fetchCategories();
+      await _loadUser();
+      await loadCartItemCount();
+      
+      setState(() {
+        _hasInitialDataLoaded = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
@@ -112,17 +141,60 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // Load cart count (only called initially and when returning from cart)
   Future<void> loadCartItemCount() async {
     try {
-      final List<CartItem> cartItems = await CartService.fetchCart();
       setState(() {
+        isCartCountLoading = true;
+      });
+
+      final List<CartItem> cartItems = await CartService.fetchCart();
+
+      setState(() {
+        isCartCountLoading = false;
         cartItemCount = cartItems.length;
       });
     } catch (e) {
       print("Error fetching cart item count: $e");
       setState(() {
+        isCartCountLoading = false;
         cartItemCount = 0;
       });
+    }
+  }
+
+  // Method to refresh only cart count (can be called when user returns to home)
+  Future<void> refreshCartCount() async {
+    await loadCartItemCount();
+  }
+
+  // Navigate to cart screen and handle return
+  Future<void> _navigateToCartScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CartScreen(),
+      ),
+    );
+
+    // Only refresh cart count if cart was modified
+    if (result == 'cart_updated' || result == true) {
+      loadCartItemCount();
+    }
+  }
+
+  // Navigate to product details screen and handle return
+  Future<void> _navigateToProductDetailsScreen(dynamic product) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetails(product: product),
+      ),
+    );
+
+    // Only refresh cart count if cart was modified
+    if (result == 'cart_updated_int_product_details' || result == true) {
+      loadCartItemCount();
     }
   }
 
@@ -212,18 +284,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> fetchFeaturedProducts() async {
-    try {
-      final products = await _productService.getFeaturedProducts();
-      setState(() {
-        _featuredProducts = products;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error: $e');
-    }
-  }
-
   Future<void> _fetchProductsByCategory(String catName) async {
     setState(() {
       _isLoading = true;
@@ -248,20 +308,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> fetchAllProducts() async {
-    try {
-      final products = await _productService.getProducts();
-      setState(() {
-        _allProducts = products;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error fetching all products: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     return WillPopScope(
       onWillPop: () async {
         final shouldExit = await showDialog<bool>(
@@ -336,14 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   IconButton(
                     icon: const Icon(Icons.shopping_cart_outlined,
                         color: Colors.black87),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CartScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: _navigateToCartScreen,
                   ),
                   if (cartItemCount > 0)
                     Positioned(
@@ -357,14 +400,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         constraints:
                             const BoxConstraints(minWidth: 20, minHeight: 20),
-                        child: Text(
-                          '$cartItemCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        child: isCartCountLoading
+                            ? SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                '$cartItemCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                       ),
                     ),
                 ],
@@ -385,6 +437,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBodyContent() {
+    // Show loading only if data hasn't been loaded initially
+    if (!_hasInitialDataLoaded) {
+      return _buildLoadingView();
+    }
+
     switch (_currentPage) {
       case HomePageView.menu:
         return FilterScreen(
@@ -394,6 +451,9 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedCatName = categoryName;
           },
           onPriceFilter: (minPrice, maxPrice) {
+            filteredminPrice = minPrice;
+            filteredmaxPrice = maxPrice;
+            filteredrating = null;
             _fetchProductsByPrice(
               minPrice: minPrice,
               maxPrice: maxPrice,
@@ -402,6 +462,9 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
           onRatingFilter: (rating) {
+            filteredrating = rating;
+            filteredminPrice = null;
+            filteredmaxPrice = null;
             _fetchProductsByRating(
               rating: rating,
               categoryId: selectedCatId,
@@ -410,18 +473,20 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           onApplyFilters: () {
             if (selectedCatId.isNotEmpty) {
+              filteredminPrice = null;
+              filteredmaxPrice = null;
+              filteredrating = null;
               _fetchProductsByCategory(selectedCatName);
             }
           },
           onClose: _onCloseMenu,
         );
       case HomePageView.home:
-        return _isLoading
-            ? _buildLoadingView()
-            : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: _buildContentView(),
-              );
+        return SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: _buildContentView(),
+        );
       case HomePageView.filtered:
         return FilteredProductsScreen(
           products: _filteredProducts,
@@ -434,33 +499,47 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContentView() {
-    return Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Main scrollable content (banners, featured, all)
-        SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AutoScrollBanner(),
-              _buildSectionTitle('Featured Categories'),
-              _buildCategorySection(),
-              _buildSectionTitle('Featured Products'),
-              _buildFeaturedProducts(),
-              SizedBox(
-                height: 20,
-              ),
-              _buildSectionTitle('All Products'),
-              _buildAllProducts(),
-            ],
-          ),
+        AutoScrollBannerWidget(
+          key: _bannerKey,
+          height: 180.0,
+          autoScrollDuration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(16.0),
+          borderRadius: BorderRadius.circular(12.0),
+          onBannerTap: () {
+            // Handle banner tap - navigate to specific screen or show details
+            print('Banner tapped');
+          },
         ),
+        _buildSectionTitle('Featured Categories'),
+        _buildCategorySection(),
+        _buildSectionTitle('Featured Products'),
+        FeaturedProductsWidget(
+          key: _featuredProductsKey,
+          onProductTap: _navigateToProductDetailsScreen,
+          parentScrollController: _scrollController,
+          initialVisibleCount: 4,
+        ),
+        const SizedBox(height: 20),
+        _buildSectionTitle('All Products'),
+        AllProductsWidget(
+          key: _allProductsKey,
+          onProductTap: _navigateToProductDetailsScreen,
+          parentScrollController: _scrollController,
+        ),
+        const SizedBox(height: 20), // Add some bottom padding
       ],
     );
   }
 
   Widget _buildCategorySection() {
     if (_categories.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        height: 120,
+        child: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Padding(
@@ -469,6 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 120,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
           itemCount: _categories.length,
           itemBuilder: (context, index) {
             final category = _categories[index];
@@ -496,11 +576,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 8),
                     Text(
                       category.name,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -512,249 +597,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFeaturedProducts() {
-    if (_featuredProducts.isEmpty) {
-      return const Center(child: Text('No featured products available.'));
-    }
-
-    final visibleProducts =
-        _featuredProducts.reversed.take(_visibleFeaturedCount).toList();
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final crossAxisCount = isTablet ? 3 : 2;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-      child: Column(
-        children: [
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 5,
-              mainAxisSpacing: 5,
-              childAspectRatio: 0.75, // Fixed optimal ratio
-            ),
-            itemCount: visibleProducts.length,
-            itemBuilder: (context, index) {
-              final product = visibleProducts[index];
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProductDetails(product: product),
-                    ),
-                  );
-                },
-                child: UniversalProductCard(product: product),
-              );
-            },
-          ),
-          if (_visibleFeaturedCount < _featuredProducts.length)
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _visibleFeaturedCount += 5;
-                  if (_visibleFeaturedCount > _featuredProducts.length) {
-                    _visibleFeaturedCount = _featuredProducts.length;
-                  }
-                });
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: const Color.fromARGB(255, 1, 140, 255),
-              ),
-              child: const Text('View All'),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAllProducts() {
-    if (_allProducts.isEmpty) {
-      return const Center(child: Text('No products available.'));
-    }
-
-    final visibleProducts =
-        _allProducts.reversed.take(_visibleAllCount).toList();
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final crossAxisCount = isTablet ? 3 : 2;
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-        child: Column(
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // Keep aspect ratio consistent
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: 0.75, // Fixed optimal ratio
-                  ),
-                  itemCount: visibleProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = visibleProducts[index];
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ProductDetails(product: product),
-                          ),
-                        );
-                      },
-                      child: UniversalProductCard(product: product),
-                    );
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            if (_visibleAllCount < _allProducts.length)
-              Align(
-                alignment: Alignment.center,
-                child: TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _visibleAllCount += 5;
-                      if (_visibleAllCount > _allProducts.length) {
-                        _visibleAllCount = _allProducts.length;
-                      }
-                    });
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color.fromARGB(255, 1, 140, 255),
-                  ),
-                  child: const Text('View All'),
-                ),
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.displaySmall,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
       ),
-    );
-  }
-}
-
-class AutoScrollBanner extends StatefulWidget {
-  const AutoScrollBanner({Key? key}) : super(key: key);
-
-  @override
-  _AutoScrollBannerState createState() => _AutoScrollBannerState();
-}
-
-class _AutoScrollBannerState extends State<AutoScrollBanner> {
-  List<BannerModel> _banners = [];
-  final PageController _pageController = PageController();
-  int _currentIndex = 0;
-  Timer? _timer;
-  final _bannerService = BannerService();
-
-  @override
-  void initState() {
-    super.initState();
-    fetchBanners();
-  }
-
-  Future<void> fetchBanners() async {
-    setState(() {});
-
-    try {
-      final banners = await _bannerService.fetchMainBanners();
-      if (!mounted) return;
-      setState(() {
-        _banners = banners;
-      });
-      _startAutoScroll();
-    } catch (e) {
-      print('Error fetching banners: $e');
-      if (!mounted) return;
-      setState(() {});
-    }
-  }
-
-  void _startAutoScroll() {
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_banners.isEmpty) return;
-
-      int nextPage = _currentIndex + 1;
-      if (nextPage >= _banners.length) {
-        _pageController.jumpToPage(0);
-        _currentIndex = 0;
-      } else {
-        _pageController.animateToPage(
-          nextPage,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-        _currentIndex = nextPage;
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 180.0,
-      child: _banners.isEmpty
-          ? const Center(child: Text('No banners available'))
-          : PageView.builder(
-              controller: _pageController,
-              itemCount: _banners.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12.0),
-                    image: DecorationImage(
-                      image: NetworkImage(_banners[index].images.first),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    padding: const EdgeInsets.all(16.0),
-                    child: const Align(
-                      alignment: Alignment.bottomLeft,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
     );
   }
 }

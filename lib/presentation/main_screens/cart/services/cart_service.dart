@@ -7,7 +7,17 @@ import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart
 class CartService {
   static String? baseUrl = '${dotenv.env['BASE_URL']}/cart';
 
+  // Original method - kept for backward compatibility
   static Future<List<CartItem>> fetchCart() async {
+    final response = await fetchCartWithPagination(page: 1, perPage: 100);
+    return response['items'] ?? [];
+  }
+
+  // New method with pagination support
+  static Future<Map<String, dynamic>> fetchCartWithPagination({
+    required int page,
+    required int perPage,
+  }) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('token');
 
@@ -15,7 +25,7 @@ class CartService {
       throw Exception('Token not found. User might not be logged in.');
     }
 
-    final Uri url = Uri.parse(baseUrl!);
+    final Uri url = Uri.parse('$baseUrl?page=$page&perPage=$perPage');
 
     final response = await http.get(
       url,
@@ -27,13 +37,25 @@ class CartService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      print('daaaa:$data');
-      if (data['data'] is List) {
-        return (data['data'] as List)
+      
+      if (data['data'] is List && data['pagination'] != null) {
+        final items = (data['data'] as List)
             .map((item) => CartItem.fromJson(item))
             .toList();
+        
+        final pagination = data['pagination'];
+        
+        return {
+          'items': items,
+          'currentPage': pagination['currentPage'] ?? 1,
+          'totalPages': pagination['totalPages'] ?? 1,
+          'totalItems': pagination['totalItems'] ?? 0,
+          'hasNextPage': pagination['hasNextPage'] ?? false,
+          'hasPrevPage': pagination['hasPrevPage'] ?? false,
+          'perPage': pagination['perPage'] ?? perPage,
+        };
       } else {
-        throw Exception('Unexpected response format: "data" is not a list');
+        throw Exception('Unexpected response format');
       }
     } else {
       throw Exception(
@@ -49,7 +71,7 @@ class CartService {
     final response = await http.delete(
       url,
       headers: {
-        'Authorization': token ?? '',
+        'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
     );
@@ -85,7 +107,7 @@ class CartService {
       },
       body: json.encode(body),
     );
-
+    print('token: $token');
     print('🛒 addToCart response: ${response.statusCode} - ${response.body}');
 
     final Map<String, dynamic> data = json.decode(response.body);
@@ -106,7 +128,7 @@ class CartService {
     final response = await http.get(
       url,
       headers: {
-        'Authorization': token ?? '',
+        'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
     );
@@ -140,7 +162,7 @@ class CartService {
     final response = await http.put(
       Uri.parse('$baseUrl/$cartItemId'),
       headers: {
-        'Authorization': token ?? '',
+        'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
       body: json.encode(body),

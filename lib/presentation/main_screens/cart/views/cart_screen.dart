@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/checkout_screen.dart';
-// import 'package:happy_farm/screens/productdetails_screen.dart';
 import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
-import 'package:happy_farm/presentation/main_screens/main_screen.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:happy_farm/widgets/without_login_screen.dart';
@@ -11,8 +10,9 @@ import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CartScreen extends StatefulWidget {
-
-  const CartScreen({super.key,});
+  const CartScreen({
+    super.key,
+  });
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -21,16 +21,52 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   late List<CartItem> _cartItems = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   bool _isLoggedIn = false;
   Set<String> _updatingItemIds = {};
   Set<String> _deletingItemIds = {};
   Set<String> _updatingAdd = {};
   Set<String> _updatingRemove = {};
+  bool _cartWasModified = false;
+
+  // Pagination variables
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  bool _hasMoreItems = true;
+  final int _perPage = 5;
+
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _setupScrollListener();
     _checkLoginAndFetchCart();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        if (!_isLoadingMore && _hasMoreItems && _currentPage < _totalPages) {
+          _loadMoreCartItems();
+        }
+      }
+    });
+  }
+
+  void _onCartModified() {
+    setState(() {
+      _cartWasModified = true;
+    });
   }
 
   Future<void> _checkLoginAndFetchCart() async {
@@ -53,23 +89,87 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  void _fetchCart() {
-    CartService.fetchCart().then((items) {
+  Future<void> _fetchCart() async {
+    try {
       setState(() {
-        _cartItems = items;
+        _isLoading = true;
+      });
+
+      final response = await CartService.fetchCartWithPagination(
+        page: _currentPage,
+        perPage: _perPage,
+      );
+
+      setState(() {
+        _cartItems = response['items'] ?? [];
+        _totalPages = response['totalPages'] ?? 1;
+        _totalItems = response['totalItems'] ?? 0;
+        _hasMoreItems = response['hasNextPage'] ?? false;
         _isLoading = false;
       });
-    }).catchError((error) {
+    } catch (error) {
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to load cart items');
+      }
+    }
+  }
+
+  Future<void> _loadMoreCartItems() async {
+    if (_isLoadingMore || !_hasMoreItems || _currentPage >= _totalPages) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
     });
+
+    try {
+      final nextPage = _currentPage + 1;
+
+      final response = await CartService.fetchCartWithPagination(
+        page: nextPage,
+        perPage: _perPage,
+      );
+
+      final newItems = response['items'] ?? [];
+
+      setState(() {
+        if (newItems.isNotEmpty) {
+          _cartItems.addAll(newItems);
+          _currentPage = nextPage;
+        }
+        _hasMoreItems = response['hasNextPage'] ?? false;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingMore = false;
+      });
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to load more cart items');
+      }
+    }
+  }
+
+  Future<void> _refreshCart() async {
+    setState(() {
+      _cartItems = [];
+      _currentPage = 1;
+      _hasMoreItems = true;
+      _isLoadingMore = false;
+      _totalPages = 1;
+      _totalItems = 0;
+    });
+    await _fetchCart();
   }
 
   Future<void> _handleUpdateCartItem({
     required String cartItemId,
     int? newQuantity,
-    String? newPriceId,
+    String? priceId,
   }) async {
     setState(() => _updatingItemIds.add(cartItemId));
 
@@ -77,7 +177,7 @@ class _CartScreenState extends State<CartScreen> {
       final updated = await CartService.updateCartItem(
         cartItemId: cartItemId,
         quantity: newQuantity,
-        priceId: newPriceId,
+        priceId: priceId,
       );
 
       final index = _cartItems.indexWhere((e) => e.id == cartItemId);
@@ -99,75 +199,111 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color.fromRGBO(245, 245, 245, 1),
-      appBar: AppBar(
-        title: const Text("My Cart"),
-        centerTitle: true,
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (builder) => MainScreen(
-                selectedIndex: 0,
-              ),
-            ),
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, _cartWasModified ? 'cart_updated' : null);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: const Color.fromRGBO(245, 245, 245, 1),
+        appBar: AppBar(
+          title: const Text("My Cart"),
+          centerTitle: true,
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context, _cartWasModified ? 'cart_updated' : null);
+            },
           ),
         ),
-      ),
-      body: _isLoading
-          ? Center(child: Lottie.asset('assets/lottie/cartloading.json'))
-          : !_isLoggedIn
-              ? WithoutLoginScreen(
-                title: 'cart',
-                subText: 'Login to add products to your cart and mange your orders',
-                icon: Icons.shopping_cart_outlined,
-              )
-              : _cartItems.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Lottie.asset('assets/lottie/emptyCart.json'),
-                          SizedBox(
-                              height: 16), // spacing between animation and text
-                          Text(
-                            'Your cart is empty!',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[700],
+        body: _isLoading
+            ? Center(child: Lottie.asset('assets/lottie/cartloading.json'))
+            : !_isLoggedIn
+                ? WithoutLoginScreen(
+                    title: 'cart',
+                    subText:
+                        'Login to add products to your cart and mange your orders',
+                    icon: Icons.shopping_cart_outlined,
+                  )
+                : _cartItems.isEmpty && !_isLoading
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Lottie.asset('assets/lottie/emptyCart.json'),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Your cart is empty!',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[700],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: ListView(
-                            padding: const EdgeInsets.all(12),
-                            children: [
-                              ..._cartItems
-                                  .map((item) => _buildCartItem(item))
-                                  .toList(),
-                              const SizedBox(height: 16),
-                              _buildPaymentDetails(
-                                  _cartItems.length, _calculateTotal()),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
+                          ],
                         ),
-                        _buildBottomBar(_calculateTotal()),
-                      ],
-                    ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _refreshCart,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(12),
+                                itemCount: _cartItems.length +
+                                    (_hasMoreItems ? 1 : 0) +
+                                    1, // +1 for payment details
+                                itemBuilder: (context, index) {
+                                  if (index < _cartItems.length) {
+                                    return _buildCartItem(_cartItems[index]);
+                                  } else if (index == _cartItems.length &&
+                                      _hasMoreItems) {
+                                    return _buildLoadMoreIndicator();
+                                  } else {
+                                    return _buildPaymentDetailsSection();
+                                  }
+                                },
+                              ),
+                            ),
+                            if (_cartItems.isNotEmpty)
+                              _buildBottomBar(_calculateTotal()),
+                          ],
+                        ),
+                      ),
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreIndicator() {
+    if (_isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        const SizedBox(height: 0),
+      ],
+    );
+  }
+
+  Widget _buildPaymentDetailsSection() {
+    return Column(
+      children: [
+        const SizedBox(height: 16),
+        _buildPaymentDetails(_totalItems, _calculateTotal()),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
@@ -178,9 +314,11 @@ class _CartScreenState extends State<CartScreen> {
 
     return GestureDetector(
       onTap: () {
-        // Navigator.of(context).push(MaterialPageRoute(
-        //   builder: (_) => ProductDetails(product: item.product),
-        // ));
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ProductDetails(product: item.product),
+          ),
+        );
       },
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -239,7 +377,7 @@ class _CartScreenState extends State<CartScreen> {
                           )
                         : const Icon(Icons.delete, color: Colors.red),
                     onPressed: _deletingItemIds.contains(item.id)
-                        ? null // disable while this item is deleting
+                        ? null
                         : () async {
                             setState(() {
                               _deletingItemIds.add(item.id);
@@ -251,8 +389,14 @@ class _CartScreenState extends State<CartScreen> {
 
                               if (mounted) {
                                 showSuccessSnackbar(context, msg);
-                                _fetchCart(); // Optionally reload cart
+                                // Remove the item from the list instead of refetching
+                                setState(() {
+                                  _cartItems.removeWhere(
+                                      (cartItem) => cartItem.id == item.id);
+                                  _totalItems--;
+                                });
                               }
+                              _onCartModified();
                             } catch (e) {
                               if (mounted) {
                                 showErrorSnackbar(context, '$e');
@@ -298,6 +442,7 @@ class _CartScreenState extends State<CartScreen> {
                                   setState(() {
                                     _cartItems[itemIndex] = updatedItem;
                                   });
+                                  _onCartModified();
                                 } catch (e) {
                                   showErrorSnackbar(context, '$e');
                                 } finally {
@@ -338,6 +483,7 @@ class _CartScreenState extends State<CartScreen> {
                                   setState(() {
                                     _cartItems[itemIndex] = updatedItem;
                                   });
+                                  _onCartModified();
                                 } catch (e) {
                                   showErrorSnackbar(context, '$e');
                                 } finally {
@@ -361,6 +507,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildPaymentDetails(int itemCount, int total) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -459,7 +606,10 @@ class _CartScreenState extends State<CartScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text("Proceed"),
+              child: const Text(
+                "Proceed",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),

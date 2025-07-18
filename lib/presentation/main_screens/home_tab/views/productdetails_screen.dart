@@ -6,14 +6,12 @@ import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart
 import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/product_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/review_service.dart';
-import 'package:happy_farm/presentation/main_screens/main_screen.dart';
 import 'package:happy_farm/presentation/main_screens/wishlist/services/whislist_service.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_dialog.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-//
 
 class ProductDetails extends StatefulWidget {
   final dynamic product;
@@ -37,7 +35,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   bool isLoadingCart = false;
   bool isSubmittingReview = false;
   bool isCartStatusLoading = false;
-  bool isLoadingProductDetails = true; // Add this for product refresh loading
+  bool isLoadingProductDetails = true;
+  bool _cartWasModified = false;
   String? userId;
 
   // Store the current product data
@@ -94,16 +93,47 @@ class _ProductDetailsState extends State<ProductDetails> {
         isCart = freshProduct.isAddedToCart ?? false;
         isLoadingProductDetails = false;
       });
+      print(isCart);
+      print(isWish);
     } catch (e) {
       setState(() {
         isLoadingProductDetails = false;
       });
       print('Error refreshing product details: $e');
-      // Keep using the original product data if refresh fails
       setState(() {
         isWish = getIsWishList();
         isCart = getIsCart();
       });
+    }
+  }
+
+  // Add method to handle navigation to cart with reload on return
+  Future<void> _navigateToCart() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CartScreen(),
+      ),
+    );
+
+    // Check if we need to reload the screen when returning from cart
+    if (result == 'cart_updated' || result != null) {
+      _refreshProductDetails();
+      // Optionally show a snackbar to indicate the screen was refreshed
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Product details refreshed'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -279,6 +309,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       setState(() {
         isCart = true;
       });
+      _onCartModified();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -286,12 +317,8 @@ class _ProductDetailsState extends State<ProductDetails> {
             label: "GO TO CART",
             textColor: Colors.amber,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CartScreen(),
-                ),
-              );
+              // Use the new navigation method
+              _navigateToCart();
             },
           ),
           backgroundColor: Colors.black87,
@@ -312,6 +339,12 @@ class _ProductDetailsState extends State<ProductDetails> {
     });
   }
 
+  void _onCartModified() {
+    setState(() {
+      _cartWasModified = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final prices = getProductPrices();
@@ -325,16 +358,9 @@ class _ProductDetailsState extends State<ProductDetails> {
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (builder) => MainScreen(
-                selectedIndex: 0,
-              ),
-            ),
-          ),
-        ),
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context,
+                _cartWasModified ? 'cart_updated_int_product_details' : null)),
       ),
       backgroundColor: Colors.white,
       body: isLoadingProductDetails
@@ -436,7 +462,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                   onLeftButtonPressed: () => Navigator.pop(context),
                   onRightButtonPressed: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => LoginScreen()));
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => LoginScreen()));
                   },
                 );
               } else if (!isLoadingWish) {
@@ -601,16 +628,15 @@ class _ProductDetailsState extends State<ProductDetails> {
                       onLeftButtonPressed: () => Navigator.pop(context),
                       onRightButtonPressed: () {
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => LoginScreen()));
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => LoginScreen()));
                       },
                     );
                   } else {
                     isCart
-                        ? Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (builder) => CartScreen(),
-                            ),
-                          )
+                        ? _navigateToCart() // Use the new navigation method
                         : addToCart();
                   }
                 },
@@ -740,24 +766,27 @@ class _ProductDetailsState extends State<ProductDetails> {
             ),
             GestureDetector(
               onTap: () {
-               if (userId == null) {
-                    showCustomDialog(
-                      context: context,
-                      title: 'Login Required',
-                      message: 'Please Login to continue',
-                      leftButtonText: 'Cancel',
-                      rightButtonText: 'Login',
-                      icon: Icons.warning,
-                      primaryColor: AppTheme.primaryColor,
-                      onLeftButtonPressed: () => Navigator.pop(context),
-                      onRightButtonPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => LoginScreen()));
-                      },
-                    );}
-              else{
-                _showWriteReviewModal();
-              }
+                if (userId == null) {
+                  showCustomDialog(
+                    context: context,
+                    title: 'Login Required',
+                    message: 'Please Login to continue',
+                    leftButtonText: 'Cancel',
+                    rightButtonText: 'Login',
+                    icon: Icons.warning,
+                    primaryColor: AppTheme.primaryColor,
+                    onLeftButtonPressed: () => Navigator.pop(context),
+                    onRightButtonPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => LoginScreen()));
+                    },
+                  );
+                } else {
+                  _showWriteReviewModal();
+                }
               },
               child: Container(
                 padding:

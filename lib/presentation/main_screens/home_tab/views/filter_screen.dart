@@ -402,15 +402,6 @@ class _FilterScreenState extends State<FilterScreen> {
     );
   }
 
-  void _clearAllFilters() {
-    setState(() {
-      _selectedCatId = '';
-      _selectedCatName = '';
-      _priceRange = RangeValues(_minPrice, _maxPrice);
-      _selectedRating = 0;
-    });
-  }
-
   void _applyFilters() {
     if (_selectedCatId.isEmpty) {
       showInfoSnackbar(context, 'Please select a category first.');

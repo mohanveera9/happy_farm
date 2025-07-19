@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:happy_farm/presentation/auth/views/login_screen.dart';
+import 'package:happy_farm/presentation/auth/views/phone_input_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
 import 'package:happy_farm/models/user_provider.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart';
@@ -118,6 +118,7 @@ class _ProductDetailsState extends State<ProductDetails> {
 
     // Check if we need to reload the screen when returning from cart
     if (result == 'cart_updated' || result != null) {
+      _cartWasModified = true;
       _refreshProductDetails();
       // Optionally show a snackbar to indicate the screen was refreshed
       if (mounted) {
@@ -360,7 +361,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context,
-                _cartWasModified ? 'cart_updated_int_product_details' : null)),
+                _cartWasModified ? 'cart_updated' : null)),
       ),
       backgroundColor: Colors.white,
       body: isLoadingProductDetails
@@ -463,7 +464,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   onRightButtonPressed: () {
                     Navigator.pop(context);
                     Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => LoginScreen()));
+                        MaterialPageRoute(builder: (context) => PhoneInputScreen()));
                   },
                 );
               } else if (!isLoadingWish) {
@@ -631,7 +632,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                         Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => LoginScreen()));
+                                builder: (context) => PhoneInputScreen()));
                       },
                     );
                   } else {
@@ -781,7 +782,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => LoginScreen()));
+                              builder: (context) => PhoneInputScreen()));
                     },
                   );
                 } else {

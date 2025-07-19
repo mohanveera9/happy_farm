@@ -4,7 +4,6 @@ import 'package:happy_farm/presentation/main_screens/main_screen.dart';
 import 'package:happy_farm/presentation/main_screens/profile/views/contact_screen.dart';
 import 'package:happy_farm/presentation/main_screens/profile/views/privacypolicyscreen.dart';
 import 'package:happy_farm/presentation/main_screens/profile/views/saved_address.dart';
-import 'package:happy_farm/presentation/main_screens/profile/views/update_password.dart';
 import 'package:happy_farm/presentation/main_screens/profile/widgets/custom_dialog.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
@@ -530,14 +529,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   if (success) {
                                     userProvider.updateProfileImage('');
                                     Navigator.of(context).pop();
-                                    showSuccessSnackbar(context, 'Profile image deleted successfully');
+                                    showSuccessSnackbar(context,
+                                        'Profile image deleted successfully');
                                   } else {
                                     Navigator.of(context).pop();
-                                    showErrorSnackbar(context,'Failed to delete profile image');
+                                    showErrorSnackbar(context,
+                                        'Failed to delete profile image');
                                   }
                                 },
-                                icon:
-                                    const Icon(Icons.delete_outline, size: 18, color: Colors.red,),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: Colors.red,
+                                ),
                                 label: const Text("Remove"),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red.shade50,
@@ -563,7 +567,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     oldImageUrl: currentImage,
                                   );
                                 },
-                                icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white,),
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
                                 label: const Text("Edit"),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.primaryColor,
@@ -851,16 +859,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       },
       {
-        'icon': Icons.lock_outlined,
-        'title': 'Security',
-        'subtitle': 'Change password',
-        'function': () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (builder) => UpdatePassword()),
-          );
-        }
-      },
-      {
         'icon': Icons.help_outline,
         'title': 'Contact & Support',
         'subtitle': 'Get assistance and answers',
@@ -907,7 +905,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(context);
               },
               msg1: 'Cancel',
-              msg2:'Logout',
+              msg2: 'Logout',
             ),
           );
         }

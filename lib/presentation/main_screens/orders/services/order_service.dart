@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderService {
-  static  String? baseUrl = '${dotenv.env['BASE_URL']}';
+  static String? baseUrl = '${dotenv.env['BASE_URL']}';
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -84,11 +84,8 @@ class OrderService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('Manoj:$data');
-        print('Manoj2:${data['data']['orders']}');
-        return data['data']['orders']; 
 
-
+        return data['data']['orders'];
       } else {
         print('Failed to fetch orders: ${response.statusCode}');
         return null;

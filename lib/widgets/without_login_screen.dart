@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:happy_farm/presentation/auth/views/login_screen.dart';
-import 'package:happy_farm/presentation/auth/views/register_screen.dart';
+import 'package:happy_farm/presentation/auth/views/phone_input_screen.dart';
 
 class WithoutLoginScreen extends StatelessWidget {
   IconData icon;
   String title;
   String subText;
-  WithoutLoginScreen({
-    Key? key,
-    required this.icon,
-    required this.title,
-    required this.subText
-  }) : super(key: key);
+  WithoutLoginScreen(
+      {Key? key,
+      required this.icon,
+      required this.title,
+      required this.subText})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +84,7 @@ class WithoutLoginScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (builder) => LoginScreen(),
+                    builder: (builder) => PhoneInputScreen(),
                   ),
                 );
               },
@@ -108,40 +107,6 @@ class WithoutLoginScreen extends StatelessWidget {
           ),
 
           const SizedBox(height: 16),
-
-          // Register Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (builder) => SignUpScreen(),
-                  ),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF298C4C),
-                side: const BorderSide(
-                  color: Color(0xFF298C4C),
-                  width: 2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-              child: const Text(
-                'Create Account',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
         ],
       ),
     );

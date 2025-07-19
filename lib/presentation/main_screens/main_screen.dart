@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/user_provider.dart';
 import 'package:happy_farm/presentation/main_screens/cart/services/cart_service.dart';
+import 'package:happy_farm/presentation/main_screens/cart/views/cart_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/category_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/home_screen.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
 import 'package:happy_farm/presentation/main_screens/orders/views/order_screen.dart';
 import 'package:happy_farm/presentation/main_screens/profile/views/profile_screen.dart';
 import 'package:happy_farm/presentation/main_screens/search/views/search_screen.dart';
@@ -71,6 +73,7 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
   }
+  
   late int _selectedIndex;
   bool _isCheckingLogin = true;
   bool _isLoggedIn = false;
@@ -120,6 +123,32 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<void> _navigateToCartScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CartScreen(),
+      ),
+    );
+    
+    if (result == 'cart_updated') {
+      await _fetchCartCount();
+    }
+  }
+
+  Future<void> _naviagateToProductDetailsScreen(dynamic product) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetails(product: product,),
+      ),
+    );
+    
+    if (result == 'cart_updated') {
+      await _fetchCartCount();
+    }
+  }
+
 
   List<Widget> get _screens {
     return [
@@ -131,6 +160,8 @@ class _MainScreenState extends State<MainScreen> {
         onRefresh: _fetchHomeData,
         isLoading: _isHomeDataLoading,
         onCartChanged: _fetchCartCount,
+        onNavigateToCart: _navigateToCartScreen,
+        onProductTap: _naviagateToProductDetailsScreen,
       ),
       const SearchScreen(),
       const WishlistScreen(),
@@ -175,7 +206,7 @@ class _MainScreenState extends State<MainScreen> {
             selectedFontSize: 12,
             unselectedFontSize: 12,
             currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
+            onTap: _isHomeDataLoading ? null : _onItemTapped,
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),

@@ -26,6 +26,8 @@ class HomeScreen extends StatefulWidget {
   final bool isLoading;
   final bool isCartCountLoading;
   final Future<void> Function()? onCartChanged;
+  final Future<void> Function()? onNavigateToCart;
+  final Future<void> Function(dynamic product)? onProductTap;
 
   const HomeScreen({
     Key? key,
@@ -36,6 +38,9 @@ class HomeScreen extends StatefulWidget {
     this.isLoading = false,
     this.isCartCountLoading = false,
     this.onCartChanged,
+    this.onNavigateToCart,
+    this.onProductTap, 
+
   }) : super(key: key);
 
   @override
@@ -45,7 +50,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true; // This keeps the state alive
+  bool get wantKeepAlive => true;
 
   HomePageView _currentPage = HomePageView.home;
 
@@ -114,9 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
   final GlobalKey<State<StatefulWidget>> _bannerKey =
       GlobalKey<State<StatefulWidget>>();
 
-  // Add these to prevent rebuilding home content
-  late Widget _homeContent;
-  bool _isHomeContentInitialized = false;
+  // Removed _isHomeContentInitialized logic
 
   @override
   void initState() {
@@ -129,22 +132,31 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
+  
   Future<void> _navigateToCartScreen() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CartScreen(),
-      ),
-    );
+    if (widget.onNavigateToCart != null) {
+      await widget.onNavigateToCart!();
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CartScreen(),
+        ),
+      );
+    }
   }
 
   Future<void> _navigateToProductDetailsScreen(dynamic product) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProductDetails(product: product),
-      ),
-    );
+    if (widget.onProductTap != null) {
+      await widget.onProductTap!(product);
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProductDetails(product: product),
+        ),
+      );
+    }
   }
 
   Future<void> _fetchProductsByRating({
@@ -235,33 +247,27 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildHomeContent() {
-    if (!_isHomeContentInitialized || widget.isLoading) {
-      _homeContent = widget.isLoading
-          ? const ShimmerHomeScreen()
-          : RefreshIndicator(
-              onRefresh: () async {
-                // Reset the home content on refresh
-                setState(() {
-                  _isHomeContentInitialized = false;
-                });
-                if (widget.onRefresh != null) {
-                  await widget.onRefresh!();
-                }
-              },
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: _buildContentView(),
-              ),
-            );
-      _isHomeContentInitialized = true;
+    if (widget.isLoading) {
+      return const ShimmerHomeScreen();
+    } else {
+      return RefreshIndicator(
+        onRefresh: () async {
+          if (widget.onRefresh != null) {
+            await widget.onRefresh!();
+          }
+        },
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: _buildContentView(),
+        ),
+      );
     }
-    return _homeContent;
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     return WillPopScope(
       onWillPop: () async {
@@ -296,7 +302,6 @@ class _HomeScreenState extends State<HomeScreen>
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Left: Menu or Close
               IconButton(
                 icon: Icon(
                   (_currentPage == HomePageView.menu ||
@@ -310,8 +315,6 @@ class _HomeScreenState extends State<HomeScreen>
                     ? _onCloseMenu
                     : _onMenuTap,
               ),
-
-              // Center: Icon + Text
               GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
@@ -330,8 +333,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ],
                 ),
               ),
-
-              // Right: Cart Icon with badge
+              // Updated cart icon with loading state
               Stack(
                 children: [
                   IconButton(
@@ -339,13 +341,38 @@ class _HomeScreenState extends State<HomeScreen>
                         color: Colors.black87),
                     onPressed: _navigateToCartScreen,
                   ),
-                  if (widget.cartItemCount > 0)
+                  if (widget.isCartCountLoading)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints:
+                            const BoxConstraints(minWidth: 20, minHeight: 20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2.0),
+                          child: const SizedBox(
+                            width: 8,
+                            height: 8,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (widget.cartItemCount > 0)
                     Positioned(
                       right: 6,
                       top: 6,
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: Colors.red,
                           shape: BoxShape.circle,
                         ),
@@ -371,9 +398,7 @@ class _HomeScreenState extends State<HomeScreen>
           child: IndexedStack(
             index: _currentPage.index,
             children: [
-              // Home page (index 0)
               _buildHomeContent(),
-              // Filter page (index 1)
               FilterScreen(
                 categories: widget.categories,
                 onCategorySelected: (categoryId, categoryName) {
@@ -411,7 +436,6 @@ class _HomeScreenState extends State<HomeScreen>
                 },
                 onClose: _onCloseMenu,
               ),
-              // Filtered products page (index 2)
               FilteredProductsScreen(
                 products: _filteredProducts,
                 categoryName: filteredCategoryName,
@@ -458,7 +482,7 @@ class _HomeScreenState extends State<HomeScreen>
           onProductTap: _navigateToProductDetailsScreen,
           parentScrollController: _scrollController,
         ),
-        const SizedBox(height: 20), // Add some bottom padding
+        const SizedBox(height: 20),
       ],
     );
   }

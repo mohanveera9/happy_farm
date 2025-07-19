@@ -1,9 +1,9 @@
 // lib/utils/product_actions.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:happy_farm/presentation/auth/views/phone_input_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import '../presentation/auth/views/login_screen.dart';  // adjust the path to your LoginScreen file
 
 Future<bool> checkLoginStatus(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
@@ -25,7 +25,9 @@ Future<bool> checkLoginStatus(BuildContext context) async {
             onPressed: () {
               Navigator.of(context).pop();
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const PhoneInputScreen(),
+                ),
               );
             },
             child: const Text('Login'),
@@ -38,7 +40,8 @@ Future<bool> checkLoginStatus(BuildContext context) async {
   return true;
 }
 
-Future<bool> toggleWishlist(BuildContext context, String productId, bool isWishlist, Function(bool) updateWishlistState) async {
+Future<bool> toggleWishlist(BuildContext context, String productId,
+    bool isWishlist, Function(bool) updateWishlistState) async {
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('token');
   final userId = prefs.getString('userId');
@@ -66,7 +69,8 @@ Future<bool> toggleWishlist(BuildContext context, String productId, bool isWishl
     updateWishlistState(added);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(added ? "Added to wishlist" : "Removed from wishlist")),
+      SnackBar(
+          content: Text(added ? "Added to wishlist" : "Removed from wishlist")),
     );
 
     return added;

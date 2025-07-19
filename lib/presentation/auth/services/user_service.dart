@@ -8,18 +8,51 @@ import 'package:path/path.dart';
 class UserService {
   final String? _baseUrl = '${dotenv.env['BASE_URL']}/user';
 
-  //user sign in
-  Future<Map<String, dynamic>?> signIn({
-    required String phone,
-    required String password,
+  // Request OTP
+  Future<Map<String, dynamic>?> requestOtp({
+    required String phoneNumber,
   }) async {
-    final url = Uri.parse('$_baseUrl/signin');
+    final url = Uri.parse('$_baseUrl/request-otp');
+
+    try {
+      final body = {
+        'phoneNumber': "+91${phoneNumber.trim()}",
+      };
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      final data = jsonDecode(response.body);
+      print(data);
+      print(body);
+      if (response.statusCode == 200) {
+        return data;
+      } else {
+        return {'error': data['message'] ?? 'Failed to send OTP'};
+      }
+    } catch (e) {
+      return {'error': 'An error occurred: $e'};
+    }
+  }
+
+  // Verify OTP
+  Future<Map<String, dynamic>?> verifyOtp({
+    required String phoneNumber,
+    required String otp,
+  }) async {
+    final url = Uri.parse('$_baseUrl/verify-otp');
 
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone': phone.trim(), 'password': password.trim()}),
+        body: jsonEncode({
+          'phoneNumber': phoneNumber.trim(),
+          'otp': otp.trim(),
+        }),
       );
 
       final data = jsonDecode(response.body);
@@ -29,42 +62,83 @@ class UserService {
         await prefs.setString('userId', data['user']['_id']);
         return data;
       } else {
-        return {'error': data['msg'] ?? 'Invalid login'};
+        return {'error': data['message'] ?? 'Invalid OTP'};
       }
     } catch (e) {
       return {'error': 'An error occurred: $e'};
     }
   }
 
-  //Sign Up user
-  Future<Map<String, dynamic>?> signUp({
+  // Onboard user (set name and email after OTP verification)
+  Future<Map<String, dynamic>?> onboard({
     required String name,
-    required String phone,
-    required String email,
-    required String password,
+    String? email,
   }) async {
-    final url = Uri.parse('$_baseUrl/signup');
+    final url = Uri.parse('$_baseUrl/onboard');
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null || token.isEmpty) {
+        return {
+          'error': 'Authorization token not found. Please verify OTP first.'
+        };
+      }
+
+      final body = {
+        'name': name.trim(),
+      };
+
+      if (email != null && email.isNotEmpty) {
+        body['email'] = email.trim();
+      }
+
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': name.trim(),
-          'phone': phone.trim(),
-          'email': email.trim(),
-          'password': password.trim(),
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
       );
 
       final data = jsonDecode(response.body);
-      if (data['success'] == true && data['token']!=null){
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', data['token']);
-        await prefs.setString('userId', data['user']['_id']);
+      if (response.statusCode == 200 && data['success'] == true) {
         return data;
       } else {
-        return {'error': data['msg'] ?? 'Registration failed'};
+        return {'error': data['message'] ?? 'Onboarding failed'};
+      }
+    } catch (e) {
+      return {'error': 'An error occurred: $e'};
+    }
+  }
+
+  // Get current user details
+  Future<Map<String, dynamic>?> getMe() async {
+    final url = Uri.parse('$_baseUrl/me');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null || token.isEmpty) {
+        return {'error': 'Authorization token not found.'};
+      }
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final data = jsonDecode(response.body);
+        return {'error': data['message'] ?? 'Failed to fetch user details'};
       }
     } catch (e) {
       return {'error': 'An error occurred: $e'};
@@ -81,13 +155,13 @@ class UserService {
         throw Exception('Authorization token not found.');
       }
 
-      final url = Uri.parse('$_baseUrl/upload-image'); // ✅ Correct endpoint
+      final url = Uri.parse('$_baseUrl/upload-image');
       final request = http.MultipartRequest('POST', url);
       request.headers['Authorization'] = 'Bearer $token';
 
       request.files.add(
         await http.MultipartFile.fromPath(
-          'image', // ✅ Correct field name
+          'image',
           imageFile.path,
           filename: basename(imageFile.path),
         ),
@@ -100,7 +174,6 @@ class UserService {
         final Map<String, dynamic> data = jsonDecode(response.body);
 
         if (data['success'] == true && data['imageUrl'] != null) {
-          // ✅ Correct field
           return data['imageUrl'];
         } else {
           throw Exception('Unexpected response format: $data');
@@ -240,68 +313,16 @@ class UserService {
     }
   }
 
-  //Forgot Password
-  Future<bool> changeForgotPassword(String email, String newPassword) async {
-    final url = Uri.parse('$_baseUrl/forgotPassword/changePassword');
-
+  // Logout user
+  Future<bool> logout() async {
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'newPass': newPassword}),
-      );
-      return response.statusCode == 200;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      await prefs.remove('userId');
+      return true;
     } catch (e) {
+      print('Error during logout: $e');
       return false;
-    }
-  }
-
-  //Update Password
-  Future<Map<String, dynamic>> changePassword({
-    required String email,
-    required String currentPassword,
-    required String newPassword,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
-    final token = prefs.getString('token');
-
-    if (token == null || userId == null) {
-      return {
-        'success': false,
-        'message': 'Unauthorized. Please log in again.',
-      };
-    }
-
-    final url = Uri.parse('$_baseUrl/changePassword/$userId');
-
-    final body = {
-      'email': email,
-      'currentPassword': currentPassword,
-      'newPassword': newPassword,
-    };
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      );
-
-      final responseData = jsonDecode(response.body);
-      return {
-        'success':
-            response.statusCode == 200 && responseData['success'] == true,
-        'message': responseData['message'] ?? 'Password change failed.',
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'An error occurred. Check your internet connection.',
-      };
     }
   }
 }

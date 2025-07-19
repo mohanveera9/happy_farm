@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:happy_farm/presentation/auth/views/login_screen.dart';
-import 'package:happy_farm/presentation/auth/views/register_screen.dart';
+import 'package:happy_farm/presentation/auth/views/phone_input_screen.dart';
 import 'package:happy_farm/presentation/main_screens/main_screen.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,8 +9,6 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    
     Future<void> setIsOpened() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isopened', true);
@@ -35,11 +32,10 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Main content
-            SingleChildScrollView(
+            Center(
               child: Container(
-                height: screenHeight - MediaQuery.of(context).padding.top,
                 child: Column(
                   children: [
                     // Skip button positioned at top-right
@@ -62,21 +58,17 @@ class WelcomeScreen extends StatelessWidget {
                           style: TextButton.styleFrom(
                             foregroundColor: Colors.grey.shade600,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16, 
-                              vertical: 8
-                            ),
+                                horizontal: 16, vertical: 8),
                           ),
                           child: const Text(
                             'Skip',
                             style: TextStyle(
-                              fontSize: 16, 
-                              fontWeight: FontWeight.w500
-                            ),
+                                fontSize: 16, fontWeight: FontWeight.w500),
                           ),
                         ),
                       ),
                     ),
-                    
+
                     // Logo and content section
                     Expanded(
                       child: Padding(
@@ -102,9 +94,9 @@ class WelcomeScreen extends StatelessWidget {
                                   height: 120,
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 20),
-                              
+
                               // Welcome title
                               const Text(
                                 'Welcome to Happy Farm!',
@@ -116,22 +108,22 @@ class WelcomeScreen extends StatelessWidget {
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              
+
                               const SizedBox(height: 12),
-                              
+
                               // Description
                               Text(
                                 'Your one-stop shop for fresh farm products. Join us to enjoy a healthy and happy lifestyle!',
                                 style: TextStyle(
-                                  fontSize: 16, 
+                                  fontSize: 16,
                                   color: Colors.grey.shade700,
                                   height: 1.5,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              
+
                               const SizedBox(height: 30),
-                              
+
                               // Login button
                               SizedBox(
                                 width: double.infinity,
@@ -140,17 +132,17 @@ class WelcomeScreen extends StatelessWidget {
                                   onPressed: () async {
                                     await setIsOpened();
                                     Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => LoginScreen()
-                                      )
-                                    );
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                PhoneInputScreen()));
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.primaryColor,
                                     foregroundColor: Colors.white,
                                     elevation: 2,
-                                    shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+                                    shadowColor:
+                                        AppTheme.primaryColor.withOpacity(0.3),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -158,45 +150,8 @@ class WelcomeScreen extends StatelessWidget {
                                   child: const Text(
                                     'Login',
                                     style: TextStyle(
-                                      fontSize: 18, 
-                                      fontWeight: FontWeight.w600
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Sign up button
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    await setIsOpened();
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => SignUpScreen()
-                                      )
-                                    );
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: AppTheme.primaryColor,
-                                      width: 2,
-                                    ),
-                                    foregroundColor: AppTheme.primaryColor,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Sign Up',
-                                    style: TextStyle(
-                                      fontSize: 18, 
-                                      fontWeight: FontWeight.w600
-                                    ),
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600),
                                   ),
                                 ),
                               ),
@@ -205,9 +160,6 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    
-                    // Bottom spacing
-                    const SizedBox(height: 20),
                   ],
                 ),
               ),

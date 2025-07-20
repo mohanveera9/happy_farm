@@ -1,6 +1,9 @@
 import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
+import 'package:shimmer/shimmer.dart';
 
 class UniversalProductCard extends StatefulWidget {
   final BaseProduct product;
@@ -9,7 +12,7 @@ class UniversalProductCard extends StatefulWidget {
   const UniversalProductCard({
     super.key,
     required this.product,
-    this.imageHeight = 140, // Optimized for better ratio
+    this.imageHeight = 140, 
   });
 
   @override
@@ -36,11 +39,13 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
       } else {
         _currentPage = 0;
       }
-      _pageController.animateToPage(
-        _currentPage,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      if (mounted && _pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
     });
   }
 
@@ -49,6 +54,18 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Widget _buildImageShimmer() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.white,
+      ),
+    );
   }
 
   @override
@@ -66,9 +83,9 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image Carousel
+          // Image Carousel with Cached Network Images
           Expanded(
-            flex: 2, // Takes 3/4 of available space
+            flex: 2,
             child: Stack(
               children: [
                 ClipRRect(
@@ -81,11 +98,12 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
                         : PageView.builder(
                             controller: _pageController,
                             itemCount: widget.product.images.length,
-                            itemBuilder: (context, index) => Image.network(
-                              widget.product.images[index],
+                            itemBuilder: (context, index) => CachedNetworkImage(
+                              imageUrl: widget.product.images[index],
                               fit: BoxFit.cover,
                               width: double.infinity,
-                              errorBuilder: (context, error, stackTrace) {
+                              placeholder: (context, url) => _buildImageShimmer(),
+                              errorWidget: (context, url, error) {
                                 return const Center(
                                   child: Icon(
                                     Icons.image_not_supported,
@@ -94,10 +112,16 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
                                   ),
                                 );
                               },
+                              // Cache configuration for better performance
+                              fadeInDuration: const Duration(milliseconds: 300),
+                              fadeOutDuration: const Duration(milliseconds: 300),
+                              memCacheWidth: 400, // Optimize memory usage
+                              memCacheHeight: 400,
                             ),
                           ),
                   ),
                 ),
+                // Discount Badge
                 if (price.discount > 0)
                   Positioned(
                     top: 8,
@@ -118,12 +142,35 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
                       ),
                     ),
                   ),
+                // Image indicators for multiple images
+                if (widget.product.images.length > 1)
+                  Positioned(
+                    bottom: 8,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: widget.product.images.asMap().entries.map((entry) {
+                        return Container(
+                          width: 6.0,
+                          height: 6.0,
+                          margin: const EdgeInsets.symmetric(horizontal: 2.0),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _currentPage == entry.key
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.4),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
               ],
             ),
           ),
           // Content Section
           Expanded(
-            flex: 1, // Takes 2/4 of available space
+            flex: 1, 
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
@@ -186,85 +233,3 @@ class _UniversalProductCardState extends State<UniversalProductCard> {
     );
   }
 }
-
-// Optimized GridView Widget
-class OptimizedProductGrid extends StatelessWidget {
-  final List<BaseProduct> visibleProducts;
-  final Widget Function(BaseProduct) onProductTap;
-
-  const OptimizedProductGrid({
-    super.key,
-    required this.visibleProducts,
-    required this.onProductTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final crossAxisCount = isTablet ? 3 : 2;
-    
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.75, // Fixed optimal ratio
-      ),
-      itemCount: visibleProducts.length,
-      itemBuilder: (context, index) {
-        final product = visibleProducts[index];
-        return GestureDetector(
-          onTap: () => onProductTap(product),
-          child: UniversalProductCard(product: product),
-        );
-      },
-    );
-  }
-}
-
-// Usage Example (replace your existing GridView.builder with this):
-/*
-OptimizedProductGrid(
-  visibleProducts: visibleProducts,
-  onProductTap: (product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProductDetails(product: product),
-      ),
-    );
-  },
-)
-*/
-
-// Alternative: If you want to keep using GridView.builder directly, use this configuration:
-/*
-GridView.builder(
-  shrinkWrap: true,
-  physics: const NeverScrollableScrollPhysics(),
-  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-    crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-    crossAxisSpacing: 8,
-    mainAxisSpacing: 8,
-    childAspectRatio: 0.75, // Fixed optimal ratio
-  ),
-  itemCount: visibleProducts.length,
-  itemBuilder: (context, index) {
-    final product = visibleProducts[index];
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetails(product: product),
-          ),
-        );
-      },
-      child: UniversalProductCard(product: product),
-    );
-  },
-)
-*/

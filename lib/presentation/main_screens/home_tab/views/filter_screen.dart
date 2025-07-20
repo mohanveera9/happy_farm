@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
@@ -48,7 +49,6 @@ class _FilterScreenState extends State<FilterScreen> {
       color: Colors.white,
       child: Column(
         children: [
-          // Header with Filter title, Apply button, and Close button
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
@@ -102,7 +102,7 @@ class _FilterScreenState extends State<FilterScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           "Active Filters",
                           style: TextStyle(
                             fontSize: 16,
@@ -251,21 +251,84 @@ class _FilterScreenState extends State<FilterScreen> {
                         width: 70,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          image: DecorationImage(
-                            image: NetworkImage(category.imageUrl),
-                            fit: BoxFit.cover,
-                            colorFilter: isSelected
-                                ? ColorFilter.mode(
-                                    Colors.blue.withOpacity(0.3),
-                                    BlendMode.srcATop,
-                                  )
-                                : null,
-                          ),
                           border: Border.all(
                             color:
                                 isSelected ? Colors.blue : Colors.grey.shade300,
                             width: isSelected ? 3 : 1,
                           ),
+                        ),
+                        child: ClipOval(
+                          child: isSelected
+                              ? ColorFiltered(
+                                  colorFilter: ColorFilter.mode(
+                                    Colors.blue.withOpacity(0.3),
+                                    BlendMode.srcATop,
+                                  ),
+                                  child: CachedNetworkImage(
+                                    imageUrl: category.imageUrl,
+                                    width: 70,
+                                    height: 70,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => Container(
+                                      color: Colors.grey.shade100,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.grey),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        Container(
+                                      color: Colors.grey.shade100,
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          color: Colors.grey,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: category.imageUrl,
+                                  width: 70,
+                                  height: 70,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: Colors.grey.shade100,
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.grey),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      Container(
+                                    color: Colors.grey.shade100,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.grey,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                       if (isSelected)
@@ -408,7 +471,8 @@ class _FilterScreenState extends State<FilterScreen> {
       return;
     }
 
-    // Apply filters based on what's selected
+    widget.onCategorySelected(_selectedCatId, _selectedCatName);
+
     if (_selectedRating > 0) {
       widget.onRatingFilter(_selectedRating);
     } else if (_priceRange.start.round() != _minPrice.toInt() ||
@@ -416,7 +480,7 @@ class _FilterScreenState extends State<FilterScreen> {
       widget.onPriceFilter(_priceRange.start.round(), _priceRange.end.round());
     } else {
       // Just category filter
-      widget.onCategorySelected(_selectedCatId, _selectedCatName);
+      // Already called above
     }
 
     widget.onApplyFilters();

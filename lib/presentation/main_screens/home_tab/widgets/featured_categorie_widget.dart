@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/category_service.dart';
 
@@ -47,12 +49,27 @@ class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
         _categories = categories;
         _isLoading = false;
       });
+
+      // Pre-cache category images for better performance
+      _preCacheImages();
     } catch (e) {
       print('Error loading categories: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  // Pre-cache images to improve performance
+  void _preCacheImages() {
+    for (final category in _categories) {
+      if (category.imageUrl.isNotEmpty) {
+        precacheImage(
+          CachedNetworkImageProvider(category.imageUrl),
+          context,
+        );
+      }
     }
   }
 
@@ -88,26 +105,31 @@ class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
           margin: const EdgeInsets.only(right: 16.0),
           child: Column(
             children: [
-              Container(
-                height: widget.categorySize,
-                width: widget.categorySize,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
+              // Shimmer effect for category image
+              Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  height: widget.categorySize,
+                  width: widget.categorySize,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
-                height: 12,
-                width: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(6),
+              // Shimmer effect for category name
+              Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  height: 12,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                 ),
               ),
             ],
@@ -178,38 +200,31 @@ class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 1,
+                    offset: const Offset(0, 1),
                   ),
                 ],
               ),
               child: ClipOval(
-                child: Image.network(
-                  category.imageUrl,
+                child: CachedNetworkImage(
+                  imageUrl: category.imageUrl,
                   fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: _parseColor(category.color),
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                  placeholder: (context, url) => _buildShimmerPlaceholder(),
+                  errorWidget: (context, url, error) => Container(
+                    color: _parseColor(category.color),
+                    child: const Center(
+                      child: Icon(
+                        Icons.category,
+                        color: Colors.white,
+                        size: 32,
                       ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: _parseColor(category.color),
-                      child: const Center(
-                        child: Icon(
-                          Icons.category,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                    );
-                  },
+                    ),
+                  ),
+                  // Cache configuration
+                  fadeInDuration: const Duration(milliseconds: 300),
+                  fadeOutDuration: const Duration(milliseconds: 300),
+                  memCacheWidth: (widget.categorySize * 2).round(), 
+                  memCacheHeight: (widget.categorySize * 2).round(),
                 ),
               ),
             ),
@@ -230,13 +245,29 @@ class _FeaturedCategoriesWidgetState extends State<FeaturedCategoriesWidget> {
     );
   }
 
+  Widget _buildShimmerPlaceholder() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      period: const Duration(milliseconds: 1500), // Slower shimmer for loading
+      child: Container(
+        width: widget.categorySize,
+        height: widget.categorySize,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+
   Color _parseColor(String colorString) {
     try {
-      // Remove # if present and add 0xff prefix
+
       String cleanColor = colorString.replaceFirst('#', '');
       return Color(int.parse('0xff$cleanColor'));
     } catch (e) {
-      // Return a default color if parsing fails
+     
       return Colors.grey;
     }
   }

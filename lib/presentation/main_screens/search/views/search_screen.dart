@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/product_service.dart';
 import 'package:happy_farm/presentation/main_screens/search/services/search_service.dart';
-import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,21 +22,14 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _searchHistory = [];
   bool isLoading = false;
 
-  // Timer for debouncing API calls
   Timer? _searchTimer;
 
-  // Minimum characters before triggering search
   static const int minSearchLength = 1;
-
-  // Delay before making API call (in milliseconds)
   static const int searchDelay = 500;
 
-  // Enhanced color scheme
   static const Color primaryGreen = Color(0xFF2E7D32);
   static const Color accentGreen = Color(0xFF4CAF50);
-  static const Color lightGreen = Color(0xFF81C784);
   static const Color veryLightGreen = Color(0xFFE8F5E8);
-  static const Color darkGreen = Color(0xFF1B5E20);
   static const Color orangeAccent = Color(0xFFFF7043);
   static const Color blueAccent = Color(0xFF42A5F5);
   static const Color purpleAccent = Color(0xFF9C27B0);
@@ -50,8 +43,6 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _loadSearchHistory();
-
-    // Listen to text changes
     _controller.addListener(_onSearchTextChanged);
   }
 
@@ -66,7 +57,6 @@ class _SearchScreenState extends State<SearchScreen> {
   void _onSearchTextChanged() {
     final query = _controller.text.trim();
 
-    // Cancel any existing timer
     _searchTimer?.cancel();
 
     if (query.isEmpty) {
@@ -85,12 +75,10 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    // Show loading immediately
     setState(() {
       isLoading = true;
     });
 
-    // Set up a new timer
     _searchTimer = Timer(Duration(milliseconds: searchDelay), () {
       _performSearch(query);
     });
@@ -107,7 +95,6 @@ class _SearchScreenState extends State<SearchScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!_searchHistory.contains(query)) {
       _searchHistory.insert(0, query);
-      // Keep only last 10 searches
       if (_searchHistory.length > 10) {
         _searchHistory = _searchHistory.take(10).toList();
       }
@@ -135,20 +122,17 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final results = await _searchService.searchProducts(query: query);
 
-      // Only update if this is still the current search query
       if (_controller.text.trim() == query) {
         setState(() {
           _searchResults = results;
           isLoading = false;
         });
 
-        // Add to history only for successful searches with results
         if (results.isNotEmpty) {
           await _addToHistory(query);
         }
       }
     } catch (e) {
-      // Only show error if this is still the current search query
       if (_controller.text.trim() == query) {
         setState(() {
           isLoading = false;
@@ -159,23 +143,80 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> fetchProductById(String productId) async {
+  // Enhanced navigation method with better error handling
+  Future<void> _navigateToProductDetails(Map<String, dynamic> product) async {
     try {
       final productService = ProductService();
-      final product = await productService.getProductById(productId);
-      if (product != null) {
-        Navigator.of(context).push(
+      final productId = product['_id'] ?? product['id'];
+
+      if (productId == null || productId.toString().isEmpty) {
+        showErrorSnackbar(context, 'Invalid product ID!');
+        return;
+      }
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(15.0),
+              child: SizedBox(
+                height: 30,
+                width: 30,
+                child: CircularProgressIndicator(
+                  color: Color(0xFF298C4C),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      try {
+        final fullProduct =
+            await productService.getProductById(productId.toString());
+
+        // Dismiss loading indicator
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (builder) => ProductDetails(
-              product: product,
+            builder: (context) => ProductDetails(
+              product: fullProduct,
             ),
           ),
         );
-      } else {
-        print('No product found for ID: $productId');
+      } catch (productError) {
+        
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+
+        String errorMessage = 'Error loading product details!';
+        if (productError.toString().contains('Product not found')) {
+          errorMessage = 'Product not found!';
+        } else if (productError.toString().contains('Authentication failed')) {
+          errorMessage = 'Please log in again to view product details.';
+        } else if (productError.toString().contains('Network error')) {
+          errorMessage = 'Network error. Please check your connection.';
+        }
+
+        showErrorSnackbar(context, errorMessage);
+        print('Product fetch error: $productError');
       }
     } catch (e) {
-      print('Error fetching product: $e');
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      showErrorSnackbar(context, 'Unexpected error occurred!');
+      print('Navigation error: $e');
     }
   }
 
@@ -229,7 +270,7 @@ class _SearchScreenState extends State<SearchScreen> {
           suffixIcon: isLoading
               ? Container(
                   padding: const EdgeInsets.all(12),
-                  child: SizedBox(
+                  child: const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
@@ -379,7 +420,6 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                         onTap: () {
                           _controller.text = query;
-                          // This will trigger the search automatically
                         },
                       ),
                     );
@@ -437,17 +477,17 @@ class _SearchScreenState extends State<SearchScreen> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Color(0xFFFFF3E0),
+                  color: const Color(0xFFFFF3E0),
                   borderRadius: BorderRadius.circular(50),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.edit_rounded,
                   size: 60,
                   color: orangeAccent,
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
+              const Text(
                 "Keep typing...",
                 style: TextStyle(
                   fontSize: 20,
@@ -456,8 +496,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                "Need at least ${minSearchLength} characters to search",
+              const Text(
+                "Need at least $minSearchLength characters to search",
                 style: TextStyle(
                   fontSize: 16,
                   color: textMedium,
@@ -477,14 +517,14 @@ class _SearchScreenState extends State<SearchScreen> {
                   color: Color(0xFFFCE4EC),
                   borderRadius: BorderRadius.circular(50),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.search_off_rounded,
                   size: 60,
                   color: purpleAccent,
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
+              const Text(
                 "No products found",
                 style: TextStyle(
                   fontSize: 20,
@@ -493,7 +533,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 "Try searching with different keywords",
                 style: TextStyle(
                   fontSize: 16,
@@ -517,154 +557,129 @@ class _SearchScreenState extends State<SearchScreen> {
             ? product['prices'][0]['actualPrice']
             : null;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [cardWhite, Color(0xFFFAFBFC)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: primaryGreen.withOpacity(0.08),
-                spreadRadius: 2,
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+        return GestureDetector(
+          onTap: () => _navigateToProductDetails(product),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.grey.shade200,
+                width: 1,
               ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                spreadRadius: 1,
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: Container(
-              width: 65,
-              height: 65,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  colors: [veryLightGreen, Color(0xFFF1F8E9)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: accentGreen.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        imageUrl,
-                        width: 65,
-                        height: 65,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.image_not_supported_rounded,
-                            color: textLight,
-                            size: 28,
-                          );
-                        },
-                      ),
-                    )
-                  : Icon(
-                      Icons.eco_rounded,
-                      color: accentGreen,
-                      size: 32,
-                    ),
-            ),
-            title: Text(
-              product['name'] ?? 'No Name',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 17,
-                color: textDark,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 6),
-                if (price != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    child: Text(
-                      '₹$price',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                if (product['catName'] != null)
-                  Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Color(0xFFE8F5E8),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: lightGreen.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      '${product['catName']}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: darkGreen,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
               ],
             ),
-            trailing: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [accentGreen, lightGreen],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(16),
+              leading: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
                 ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: accentGreen.withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
+                child: imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_outlined,
+                              color: Colors.grey.shade400,
+                              size: 24,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.grey.shade400,
+                              size: 24,
+                            ),
+                          ),
+                          fadeInDuration: const Duration(milliseconds: 200),
+                          fadeOutDuration: const Duration(milliseconds: 200),
+                        ),
+                      )
+                    : Icon(
+                        Icons.shopping_bag_outlined,
+                        color: Colors.grey.shade400,
+                        size: 24,
+                      ),
+              ),
+              title: Text(
+                product['name'] ?? 'No Name',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  if (price != null)
+                    Text(
+                      '₹$price',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: Colors.green,
+                      ),
+                    ),
+                  if (product['catName'] != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${product['catName']}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              child: Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: Colors.white,
+              trailing: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: Colors.grey.shade600,
+                ),
               ),
+              // Removed the duplicate onTap handler
             ),
-            onTap: () {
-              fetchProductById(product['_id']);
-            },
           ),
         );
       },
@@ -676,44 +691,50 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       backgroundColor: backgroundGray,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildSearchField(),
-            Expanded(
-              child: isLoading
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: veryLightGreen,
-                              borderRadius: BorderRadius.circular(50),
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          child: Column(
+            children: [
+              _buildSearchField(),
+              Expanded(
+                child: isLoading
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: veryLightGreen,
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(accentGreen),
+                              ),
                             ),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(accentGreen),
+                            const SizedBox(height: 24),
+                            const Text(
+                              "Searching...",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: textDark,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            "Searching...",
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: textDark,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _searchResults.isNotEmpty || _controller.text.isNotEmpty
-                      ? _buildSearchResults()
-                      : _buildHistoryList(),
-            ),
-          ],
+                          ],
+                        ),
+                      )
+                    : _searchResults.isNotEmpty || _controller.text.isNotEmpty
+                        ? _buildSearchResults()
+                        : _buildHistoryList(),
+              ),
+            ],
+          ),
         ),
       ),
     );

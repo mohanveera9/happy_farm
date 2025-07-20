@@ -39,8 +39,7 @@ class HomeScreen extends StatefulWidget {
     this.isCartCountLoading = false,
     this.onCartChanged,
     this.onNavigateToCart,
-    this.onProductTap, 
-
+    this.onProductTap,
   }) : super(key: key);
 
   @override
@@ -63,8 +62,13 @@ class _HomeScreenState extends State<HomeScreen>
   void _onCloseMenu() {
     setState(() {
       selectedCatId = '';
-      _currentPage = HomePageView.home;
+      selectedCatName = '';
+      filteredCategoryName = '';
+      filteredminPrice = null;
+      filteredmaxPrice = null;
+      filteredrating = null;
       _filteredProducts = [];
+      _currentPage = HomePageView.home;
     });
   }
 
@@ -132,7 +136,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  
   Future<void> _navigateToCartScreen() async {
     if (widget.onNavigateToCart != null) {
       await widget.onNavigateToCart!();
@@ -360,7 +363,8 @@ class _HomeScreenState extends State<HomeScreen>
                             height: 8,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           ),
                         ),
@@ -402,13 +406,19 @@ class _HomeScreenState extends State<HomeScreen>
               FilterScreen(
                 categories: widget.categories,
                 onCategorySelected: (categoryId, categoryName) {
-                  selectedCatId = categoryId;
-                  selectedCatName = categoryName;
+                  setState(() {
+                    selectedCatId = categoryId;
+                    selectedCatName = categoryName;
+                    filteredCategoryName = categoryName;
+                  });
                 },
                 onPriceFilter: (minPrice, maxPrice) {
-                  filteredminPrice = minPrice;
-                  filteredmaxPrice = maxPrice;
-                  filteredrating = null;
+                  setState(() {
+                    filteredminPrice = minPrice;
+                    filteredmaxPrice = maxPrice;
+                    filteredrating = null;
+                    filteredCategoryName = selectedCatName;
+                  });
                   _fetchProductsByPrice(
                     minPrice: minPrice,
                     maxPrice: maxPrice,
@@ -417,9 +427,12 @@ class _HomeScreenState extends State<HomeScreen>
                   );
                 },
                 onRatingFilter: (rating) {
-                  filteredrating = rating;
-                  filteredminPrice = null;
-                  filteredmaxPrice = null;
+                  setState(() {
+                    filteredrating = rating;
+                    filteredminPrice = null;
+                    filteredmaxPrice = null;
+                    filteredCategoryName = selectedCatName;
+                  });
                   _fetchProductsByRating(
                     rating: rating,
                     categoryId: selectedCatId,
@@ -428,9 +441,10 @@ class _HomeScreenState extends State<HomeScreen>
                 },
                 onApplyFilters: () {
                   if (selectedCatId.isNotEmpty) {
-                    filteredminPrice = null;
-                    filteredmaxPrice = null;
-                    filteredrating = null;
+                    setState(() {
+                      filteredrating = null;
+                      filteredCategoryName = selectedCatName;
+                    });
                     _fetchProductsByCategory(selectedCatName);
                   }
                 },
@@ -475,7 +489,6 @@ class _HomeScreenState extends State<HomeScreen>
           parentScrollController: _scrollController,
           initialVisibleCount: 4,
         ),
-        const SizedBox(height: 20),
         _buildSectionTitle('All Products'),
         AllProductsWidget(
           key: _allProductsKey,

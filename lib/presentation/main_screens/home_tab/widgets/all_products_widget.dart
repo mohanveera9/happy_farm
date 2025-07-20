@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/product_service.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/widgets/product_card.dart';
@@ -84,6 +86,9 @@ class _AllProductsWidgetState extends State<AllProductsWidget> {
         _isLastPage = _currentPage >= _totalPages;
       });
 
+      // Pre-cache product images for better performance
+      _preCacheProductImages();
+
       print(
           "After initial fetch - Products: ${_allProducts.length}, Total Pages: $_totalPages, Current Page: $_currentPage"); // Debug print
     } catch (e) {
@@ -93,6 +98,20 @@ class _AllProductsWidgetState extends State<AllProductsWidget> {
       });
       if (mounted) {
         showErrorSnackbar(context, 'Failed to load products');
+      }
+    }
+  }
+
+  // Pre-cache product images to improve performance
+  void _preCacheProductImages() {
+    for (final product in _allProducts) {
+      for (final imageUrl in product.images) {
+        if (imageUrl.isNotEmpty) {
+          precacheImage(
+            CachedNetworkImageProvider(imageUrl),
+            context,
+          );
+        }
       }
     }
   }
@@ -143,6 +162,20 @@ class _AllProductsWidgetState extends State<AllProductsWidget> {
         _isLastPage = nextPage >= _totalPages;
         _hasMoreProducts = nextPage < _totalPages;
       });
+
+      // Pre-cache new product images
+      if (newProducts.isNotEmpty) {
+        for (final product in newProducts) {
+          for (final imageUrl in product.images) {
+            if (imageUrl.isNotEmpty) {
+              precacheImage(
+                CachedNetworkImageProvider(imageUrl),
+                context,
+              );
+            }
+          }
+        }
+      }
     } catch (e) {
       print('Error loading more products: $e');
       if (mounted) {
@@ -171,12 +204,7 @@ class _AllProductsWidgetState extends State<AllProductsWidget> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return _buildShimmerLoadingState();
     }
 
     if (_allProducts.isEmpty) {
@@ -189,6 +217,122 @@ class _AllProductsWidgetState extends State<AllProductsWidget> {
     }
 
     return _buildProductsGrid();
+  }
+
+  Widget _buildShimmerLoadingState() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    final crossAxisCount = isTablet ? 3 : 2;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.75,
+            ),
+            itemCount: 6, // Show 6 shimmer placeholders
+            itemBuilder: (context, index) {
+              return _buildProductCardShimmer();
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildProductCardShimmer() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image shimmer
+          Expanded(
+            flex: 2,
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+              ),
+            ),
+          ),
+          // Content shimmer
+          Expanded(
+            flex: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Product name shimmer
+                  Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      height: 14,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  // Price and stock shimmer
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(
+                          height: 12,
+                          width: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(
+                          height: 10,
+                          width: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildProductsGrid() {
@@ -219,34 +363,28 @@ class _AllProductsWidgetState extends State<AllProductsWidget> {
             },
           ),
         ),
-
-        // Loading indicator for pagination
         if (_isLoadingMore)
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-
-        // Show pagination info and load more button
-        if (_hasMoreProducts && !_isLoadingMore && !_isLastPage)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                Text(
-                  'Showing ${_allProducts.length} of $_totalProducts products',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
+                // Show additional shimmer cards when loading more
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: 2,
+                    itemBuilder: (context, index) {
+                      return _buildProductCardShimmer();
+                    },
                   ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _loadMoreProducts,
-                  child: Text(
-                      'Load More (Page ${_currentPage + 1} of $_totalPages)'),
                 ),
               ],
             ),

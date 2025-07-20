@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/banner_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/banner_service.dart';
@@ -51,14 +52,14 @@ class _AutoScrollBannerWidgetState extends State<AutoScrollBannerWidget> {
       });
 
       final banners = await _bannerService.fetchMainBanners();
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _banners = banners;
         _isLoading = false;
       });
-      
+
       if (_banners.isNotEmpty) {
         _startAutoScroll();
       }
@@ -156,7 +157,8 @@ class _AutoScrollBannerWidgetState extends State<AutoScrollBannerWidget> {
                 child: Container(
                   margin: widget.margin ?? const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    borderRadius: widget.borderRadius ?? BorderRadius.circular(12.0),
+                    borderRadius:
+                        widget.borderRadius ?? BorderRadius.circular(12.0),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),
@@ -166,34 +168,32 @@ class _AutoScrollBannerWidgetState extends State<AutoScrollBannerWidget> {
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: widget.borderRadius ?? BorderRadius.circular(12.0),
+                    borderRadius:
+                        widget.borderRadius ?? BorderRadius.circular(12.0),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.network(
-                          _banners[index].images.first,
+                        CachedNetworkImage(
+                          imageUrl: _banners[index].images.first,
                           fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: CircularProgressIndicator(),
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: Icon(
+                                Icons.error_outline,
+                                color: Colors.grey,
+                                size: 48,
                               ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: Icon(
-                                  Icons.error_outline,
-                                  color: Colors.grey,
-                                  size: 48,
-                                ),
-                              ),
-                            );
-                          },
+                            ),
+                          ),
+                          fadeInDuration: const Duration(milliseconds: 300),
+                          fadeOutDuration: const Duration(milliseconds: 300),
                         ),
                         // Optional overlay for better text readability
                         Container(
@@ -216,7 +216,7 @@ class _AutoScrollBannerWidgetState extends State<AutoScrollBannerWidget> {
             },
           ),
         ),
-        
+
         // Page indicators
         if (_banners.length > 1)
           Padding(

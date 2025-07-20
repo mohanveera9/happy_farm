@@ -89,8 +89,8 @@ class _ProductDetailsState extends State<ProductDetails> {
 
       setState(() {
         currentProduct = freshProduct;
-        isWish = freshProduct.isAddedToWishlist ?? false;
-        isCart = freshProduct.isAddedToCart ?? false;
+        isWish = freshProduct.isAddedToWishlist;
+        isCart = freshProduct.isAddedToCart;
         isLoadingProductDetails = false;
       });
       print(isCart);
@@ -138,15 +138,26 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
+  // Add these helper methods to your ProductDetails class to handle both Map and Model objects
+
   String getProductId() {
-    return currentProduct.id;
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['_id'] ?? currentProduct['id'] ?? '';
+    }
+    return currentProduct.id ?? '';
   }
 
   String getProductName() {
-    return currentProduct.name;
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['name'] ?? '';
+    }
+    return currentProduct.name ?? '';
   }
 
   String? getProductDescription() {
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['description'];
+    }
     if (currentProduct is FeaturedProduct || currentProduct is AllProduct) {
       return currentProduct.description;
     } else if (currentProduct is FilterProducts) {
@@ -156,10 +167,18 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   List<String> getProductImages() {
-    return currentProduct.images;
+    if (currentProduct is Map<String, dynamic>) {
+      return List<String>.from(currentProduct['images'] ?? []);
+    }
+    return currentProduct.images ?? [];
   }
 
   String getCategoryName() {
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['catName'] ??
+          currentProduct['category'] ??
+          'Unknown';
+    }
     if (currentProduct is AllProduct) {
       return currentProduct.catName;
     } else if (currentProduct is FilterProducts) {
@@ -170,6 +189,9 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   String? getSubCategoryName() {
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['subCatName'] ?? currentProduct['subCategory'];
+    }
     if (currentProduct is AllProduct) {
       return currentProduct.subCatName;
     } else if (currentProduct is FilterProducts) {
@@ -180,15 +202,24 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   bool getIsWishList() {
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['isAddedToWishlist'] ?? false;
+    }
     return currentProduct.isAddedToWishlist ?? false;
   }
 
   bool getIsCart() {
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['isAddedToCart'] ?? false;
+    }
     return currentProduct.isAddedToCart ?? false;
   }
 
   List<dynamic> getProductPrices() {
-    return currentProduct.prices;
+    if (currentProduct is Map<String, dynamic>) {
+      return currentProduct['prices'] ?? [];
+    }
+    return currentProduct.prices ?? [];
   }
 
   Future<void> checkWishlistStatus() async {
@@ -360,8 +391,8 @@ class _ProductDetailsState extends State<ProductDetails> {
         elevation: 0,
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context,
-                _cartWasModified ? 'cart_updated' : null)),
+            onPressed: () => Navigator.pop(
+                context, _cartWasModified ? 'cart_updated' : null)),
       ),
       backgroundColor: Colors.white,
       body: isLoadingProductDetails
@@ -463,8 +494,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                   onLeftButtonPressed: () => Navigator.pop(context),
                   onRightButtonPressed: () {
                     Navigator.pop(context);
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => PhoneInputScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => PhoneInputScreen()));
                   },
                 );
               } else if (!isLoadingWish) {

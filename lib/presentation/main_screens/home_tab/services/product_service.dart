@@ -7,14 +7,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ProductService {
   final String? baseUrl = '${dotenv.env['BASE_URL']}/products';
 
+  // Smart headers method - only adds Authorization if token exists
   Future<Map<String, String>> getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     print("token:$token");
-    return {
+    
+    Map<String, String> headers = {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
     };
+    
+    // Only add Authorization header if token is not null and not empty
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+      print("Added Authorization header");
+    } else {
+      print("No token found, making request without authorization");
+    }
+    
+    return headers;
   }
 
   // Updated ProductService methods
@@ -226,17 +237,105 @@ class ProductService {
     return json.decode(response.body);
   }
 
+  // SIMPLIFIED: Smart getProductById method - no duplicate functions needed
   Future<AllProduct> getProductById(String productId) async {
-    final headers = await getHeaders();
-    final uri = Uri.parse('$baseUrl/$productId');
-    final response = await http.get(uri, headers: headers);
+    try {
+      final headers = await getHeaders(); // This already handles null token
+      final uri = Uri.parse('$baseUrl/$productId');
+      print("Fetching product from: $uri");
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      final response = await http.get(uri, headers: headers);
+      print("Response status: ${response.statusCode}");
+      print("Response body: ${response.body}");
 
-      return AllProduct.fromJson(data);
-    } else {
-      throw Exception('Failed to load product');
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        Map<String, dynamic> productData;
+
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('data')) {
+            productData = responseData['data'];
+          } else if (responseData.containsKey('product')) {
+            productData = responseData['product'];
+          } else {
+            productData = responseData;
+          }
+        } else {
+          throw Exception(
+              'Invalid response format: expected Map but got ${responseData.runtimeType}');
+        }
+
+        if (productData.isEmpty) {
+          throw Exception('Product data is null or empty');
+        }
+
+        return AllProduct.fromJson(productData);
+      } else if (response.statusCode == 404) {
+        throw Exception('Product not found');
+      } else if (response.statusCode == 400 && response.body.contains('Invalid token')) {
+        // Handle invalid token by retrying without authorization
+        print("Invalid token detected, retrying without authorization");
+        return await _getProductByIdWithoutAuth(productId);
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please log in again.');
+      } else {
+        String errorMessage = 'Failed to load product. Server returned ${response.statusCode}: ${response.reasonPhrase}';
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['error'] ?? errorData['message'] ?? errorMessage;
+        } catch (e) {
+          // If error body is not JSON, use default message
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      print('Error in getProductById: $e');
+      if (e is Exception) {
+        rethrow;
+      } else {
+        throw Exception('Network error: ${e.toString()}');
+      }
+    }
+  }
+
+  // Fallback method for when token is invalid
+  Future<AllProduct> _getProductByIdWithoutAuth(String productId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/$productId');
+      print("Retrying without auth: $uri");
+
+      final response = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
+      });
+
+      print("Retry response status: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        Map<String, dynamic> productData;
+
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('data')) {
+            productData = responseData['data'];
+          } else if (responseData.containsKey('product')) {
+            productData = responseData['product'];
+          } else {
+            productData = responseData;
+          }
+        } else {
+          throw Exception(
+              'Invalid response format: expected Map but got ${responseData.runtimeType}');
+        }
+
+        return AllProduct.fromJson(productData);
+      } else {
+        throw Exception('Failed to load product even without authentication');
+      }
+    } catch (e) {
+      print('Error in _getProductByIdWithoutAuth: $e');
+      rethrow;
     }
   }
 }

@@ -292,6 +292,9 @@ class _ProductDetailsState extends State<ProductDetails> {
         isWish = true;
       });
       showSuccessSnackbar(context, 'Added to wishlist');
+
+      // Mark that wishlist was modified
+      _onWishlistModified();
     } catch (e) {
       showErrorSnackbar(context, '$e');
     } finally {
@@ -311,6 +314,9 @@ class _ProductDetailsState extends State<ProductDetails> {
         isWish = false;
       });
       showSuccessSnackbar(context, 'Item Removed from the wishlist');
+
+      // Mark that wishlist was modified
+      _onWishlistModified();
     } catch (e) {
       showErrorSnackbar(context, '$e');
     } finally {
@@ -319,6 +325,16 @@ class _ProductDetailsState extends State<ProductDetails> {
       });
     }
   }
+
+// Add this method to track wishlist modifications
+  void _onWishlistModified() {
+    setState(() {
+      _wishlistWasModified = true;
+    });
+  }
+
+// Add this boolean at the top of your ProductDetails class
+  bool _wishlistWasModified = false;
 
   Future<void> addToCart() async {
     final productId = getProductId();
@@ -391,8 +407,20 @@ class _ProductDetailsState extends State<ProductDetails> {
         elevation: 0,
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(
-                context, _cartWasModified ? 'cart_updated' : null)),
+            onPressed: () {
+              String? result;
+
+              // Determine what result to return based on what was modified
+              if (_wishlistWasModified && _cartWasModified) {
+                result = 'both_updated';
+              } else if (_wishlistWasModified) {
+                result = 'wishlist_updated';
+              } else if (_cartWasModified) {
+                result = 'cart_updated';
+              }
+
+              Navigator.pop(context, result);
+            }),
       ),
       backgroundColor: Colors.white,
       body: isLoadingProductDetails

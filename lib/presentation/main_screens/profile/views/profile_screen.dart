@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/models/user_provider.dart';
 import 'package:happy_farm/presentation/main_screens/main_screen.dart';
@@ -685,8 +686,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _buildProfileHeader(
                       user.username ?? "Unknown",
-                      user.email ?? "Unknown",
+                      user.phoneNumber ?? "Unknown",
                       user.image ?? "",
+                    
                     ),
                     const SizedBox(height: 40),
                     _buildOptions(context),
@@ -700,7 +702,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(String name, String email, String image) {
+  Widget _buildProfileHeader(String name, String phoneNumber, String image) {
     return Container(
       padding: const EdgeInsets.only(top: 30, left: 20, right: 20),
       child: Row(
@@ -729,32 +731,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     height: 80,
                     child: ClipOval(
                       child: image.isNotEmpty
-                          ? Image.network(
-                              image,
+                          ? CachedNetworkImage(
+                              imageUrl: image,
                               fit: BoxFit.cover,
                               width: 80,
                               height: 80,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  color: Colors.grey.shade200,
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    ),
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset(
-                                  'assets/images/profile.png',
-                                  fit: BoxFit.cover,
-                                );
-                              },
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Image.asset(
+                                'assets/images/profile.png',
+                                fit: BoxFit.cover,
+                              ),
                             )
                           : Container(
                               color: Colors.grey.shade200,
@@ -766,41 +762,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-                // Show loading indicator overlay when uploading
-                if (_isImageLoading)
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Uploading...',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -819,7 +780,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  email,
+                  phoneNumber,
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.black,

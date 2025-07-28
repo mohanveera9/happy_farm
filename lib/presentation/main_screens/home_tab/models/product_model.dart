@@ -247,34 +247,45 @@ class FilterProducts extends BaseProduct {
     );
   }
 }
-
 // Category Model
 class CategoryModel {
   final String id;
   final String name;
-  final String imageUrl;
+  final List<String> images;
+  final String imageUrl; // For backward compatibility
   final String color;
+  final List<CategoryModel> children;
 
   CategoryModel({
     required this.id,
     required this.name,
-    required this.imageUrl,
+    required this.images,
     required this.color,
-  });
+    this.children = const [],
+  }) : imageUrl = images.isNotEmpty ? images.first : '';
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
     return CategoryModel(
-      id: json['id'] ?? '',
+      id: json['id'] ?? json['_id'] ?? '',
       name: json['name'] ?? '',
-      imageUrl: (json['images'] as List).isNotEmpty ? json['images'][0] : '',
+      images: json['images'] != null 
+          ? List<String>.from(json['images'])
+          : [],
       color: json['color'] ?? '#ffffff',
+      children: json['children'] != null
+          ? (json['children'] as List)
+              .map((child) => CategoryModel.fromJson(child))
+              .toList()
+          : [],
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        '_id': id,
         'name': name,
-        'images': [imageUrl],
+        'images': images,
         'color': color,
+        'children': children.map((child) => child.toJson()).toList(),
       };
 }

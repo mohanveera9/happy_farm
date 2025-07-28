@@ -41,6 +41,14 @@ class _FilterScreenState extends State<FilterScreen> {
       _priceRange.end.round() != _maxPrice.toInt() ||
       _selectedRating > 0;
 
+  // Check if price filter is active
+  bool get isPriceFilterActive =>
+      _priceRange.start.round() != _minPrice.toInt() ||
+      _priceRange.end.round() != _maxPrice.toInt();
+
+  // Check if rating filter is active
+  bool get isRatingFilterActive => _selectedRating > 0;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -125,9 +133,7 @@ class _FilterScreenState extends State<FilterScreen> {
                                   _selectedCatName = '';
                                 }),
                               ),
-                            if (_priceRange.start.round() !=
-                                    _minPrice.toInt() ||
-                                _priceRange.end.round() != _maxPrice.toInt())
+                            if (isPriceFilterActive)
                               _buildFilterChip(
                                 '₹${_priceRange.start.round()} - ₹${_priceRange.end.round()}',
                                 Colors.green,
@@ -154,7 +160,7 @@ class _FilterScreenState extends State<FilterScreen> {
 
                   // CATEGORY FILTER
                   _buildFilterSection(
-                    title: "FILTER BY CATEGORY",
+                    title: "FILTER BY CATEGORY *",
                     child: _buildCategoryFilter(),
                   ),
 
@@ -366,102 +372,185 @@ class _FilterScreenState extends State<FilterScreen> {
   }
 
   Widget _buildPriceFilter() {
-    return Column(
-      children: [
-        RangeSlider(
-          values: _priceRange,
-          min: _minPrice,
-          max: _maxPrice,
-          divisions: (_maxPrice - _minPrice).toInt(),
-          activeColor: Colors.green,
-          inactiveColor: Colors.green.shade100,
-          labels: RangeLabels(
-            'Rs: ${_priceRange.start.round()}',
-            'Rs: ${_priceRange.end.round()}',
-          ),
-          onChanged: (RangeValues values) {
-            setState(() {
-              _priceRange = values;
-            });
-          },
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    bool isDisabled = isRatingFilterActive;
+
+    return Opacity(
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: IgnorePointer(
+        ignoring: isDisabled,
+        child: Column(
           children: [
-            Text(
-              'From: Rs: ${_priceRange.start.round()}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            RangeSlider(
+              values: _priceRange,
+              min: _minPrice,
+              max: _maxPrice,
+              divisions: (_maxPrice - _minPrice).toInt(),
+              activeColor: isDisabled ? Colors.grey : Colors.green,
+              inactiveColor:
+                  isDisabled ? Colors.grey.shade200 : Colors.green.shade100,
+              labels: RangeLabels(
+                'Rs: ${_priceRange.start.round()}',
+                'Rs: ${_priceRange.end.round()}',
+              ),
+              onChanged: isDisabled
+                  ? null
+                  : (RangeValues values) {
+                      // Check if trying to apply third filter
+                      if (!isPriceFilterActive &&
+                          isRatingFilterActive &&
+                          _selectedCatId.isNotEmpty) {
+                        showInfoSnackbar(context,
+                            'You can only select one additional filter along with category. Please remove the rating filter first.');
+                        return;
+                      }
+                      setState(() {
+                        _priceRange = values;
+                      });
+                    },
             ),
-            Text(
-              'To: Rs: ${_priceRange.end.round()}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'From: Rs: ${_priceRange.start.round()}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isDisabled ? Colors.grey : Colors.black,
+                  ),
+                ),
+                Text(
+                  'To: Rs: ${_priceRange.end.round()}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isDisabled ? Colors.grey : Colors.black,
+                  ),
+                ),
+              ],
             ),
+            if (isDisabled)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Remove rating filter to use price filter',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
           ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildRatingFilter() {
-    return Column(
-      children: List.generate(5, (index) {
-        int stars = 5 - index;
-        bool isSelected = _selectedRating == stars;
+    bool isDisabled = isPriceFilterActive;
 
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.orange.shade50 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected ? Colors.orange : Colors.transparent,
-              width: 1,
-            ),
-          ),
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _selectedRating = isSelected ? 0 : stars;
-              });
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      ...List.generate(5, (i) {
-                        return Icon(
-                          i < stars ? Icons.star : Icons.star_border,
-                          color: i < stars ? Colors.orange : Colors.grey,
-                          size: 24,
-                        );
-                      }),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$stars & up',
-                        style: TextStyle(
-                          color: isSelected ? Colors.orange : Colors.black,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    ],
+    return Opacity(
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: IgnorePointer(
+        ignoring: isDisabled,
+        child: Column(
+          children: [
+            ...List.generate(5, (index) {
+              int stars = 5 - index;
+              bool isSelected = _selectedRating == stars;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? (isDisabled
+                          ? Colors.grey.shade100
+                          : Colors.orange.shade50)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected
+                        ? (isDisabled ? Colors.grey : Colors.orange)
+                        : Colors.transparent,
+                    width: 1,
                   ),
-                  if (isSelected)
-                    const Icon(
-                      Icons.check_circle,
-                      color: Colors.orange,
-                      size: 20,
+                ),
+                child: InkWell(
+                  onTap: isDisabled
+                      ? null
+                      : () {
+                          // Check if trying to apply third filter
+                          if (!isRatingFilterActive &&
+                              isPriceFilterActive &&
+                              _selectedCatId.isNotEmpty) {
+                            showInfoSnackbar(context,
+                                'You can only select one additional filter along with category. Please remove the price filter first.');
+                            return;
+                          }
+                          setState(() {
+                            _selectedRating = isSelected ? 0 : stars;
+                          });
+                        },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            ...List.generate(5, (i) {
+                              return Icon(
+                                i < stars ? Icons.star : Icons.star_border,
+                                color: i < stars
+                                    ? (isDisabled ? Colors.grey : Colors.orange)
+                                    : Colors.grey,
+                                size: 24,
+                              );
+                            }),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$stars & up',
+                              style: TextStyle(
+                                color: isSelected
+                                    ? (isDisabled ? Colors.grey : Colors.orange)
+                                    : (isDisabled ? Colors.grey : Colors.black),
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isSelected && !isDisabled)
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.orange,
+                            size: 20,
+                          ),
+                      ],
                     ),
-                ],
+                  ),
+                ),
+              );
+            }),
+            if (isDisabled)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Remove price filter to use rating filter',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }),
+          ],
+        ),
+      ),
     );
   }
 
@@ -475,12 +564,8 @@ class _FilterScreenState extends State<FilterScreen> {
 
     if (_selectedRating > 0) {
       widget.onRatingFilter(_selectedRating);
-    } else if (_priceRange.start.round() != _minPrice.toInt() ||
-        _priceRange.end.round() != _maxPrice.toInt()) {
+    } else if (isPriceFilterActive) {
       widget.onPriceFilter(_priceRange.start.round(), _priceRange.end.round());
-    } else {
-      // Just category filter
-      // Already called above
     }
 
     widget.onApplyFilters();

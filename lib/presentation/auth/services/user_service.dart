@@ -50,7 +50,7 @@ class UserService {
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'phoneNumber': phoneNumber.trim(),
+          'phoneNumber': "+91${phoneNumber.trim()}",
           'otp': otp.trim(),
         }),
       );
@@ -263,8 +263,9 @@ class UserService {
         'Authorization': 'Bearer $token',
       },
     );
-
+      
     if (response.statusCode == 200) {
+
       return json.decode(response.body);
     } else {
       print('Failed to fetch user details');

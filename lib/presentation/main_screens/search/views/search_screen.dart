@@ -14,13 +14,14 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen> with WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   final SearchService _searchService = SearchService();
 
   List<Map<String, dynamic>> _searchResults = [];
   List<String> _searchHistory = [];
   bool isLoading = false;
+  bool _isVisible = true;
 
   Timer? _searchTimer;
 
@@ -44,6 +45,7 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _loadSearchHistory();
     _controller.addListener(_onSearchTextChanged);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
@@ -51,7 +53,33 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchTimer?.cancel();
     _controller.removeListener(_onSearchTextChanged);
     _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // This method is called when the widget's visibility changes
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // Check if this widget is currently visible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+        if (renderBox != null) {
+          final bool isCurrentlyVisible = renderBox.hasSize;
+          if (_isVisible && !isCurrentlyVisible) {
+            // Widget became invisible, unfocus
+            FocusScope.of(context).unfocus();
+          }
+          _isVisible = isCurrentlyVisible;
+        }
+      }
+    });
+  }
+
+  // Add this method to be called from parent when tab changes
+  void unfocusTextField() {
+    FocusScope.of(context).unfocus();
   }
 
   void _onSearchTextChanged() {
@@ -678,7 +706,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   color: Colors.grey.shade600,
                 ),
               ),
-              // Removed the duplicate onTap handler
             ),
           ),
         );

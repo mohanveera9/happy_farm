@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderService {
   static String? baseUrl = '${dotenv.env['BASE_URL']}';
+  
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -59,6 +60,7 @@ class OrderService {
       'razorpay_signature': razorpaySignature,
       'paymentHistoryId': orderId,
     });
+    
     final response = await http.post(
       Uri.parse('$baseUrl/payment/verify-order'),
       headers: headers,
@@ -73,25 +75,83 @@ class OrderService {
     }
   }
 
-  // Fetch all orders for the authenticated user
-  Future<List<dynamic>?> fetchAllOrders() async {
+  // Enhanced fetch all orders with pagination support
+  Future<Map<String, dynamic>?> fetchAllOrdersWithPagination({
+    int page = 1,
+    int perPage = 10,
+  }) async {
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/orders'),
-        headers: headers,
+      
+      final uri = Uri.parse('$baseUrl/orders').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'perPage': perPage.toString(),
+        },
       );
+      
+      final response = await http.get(uri, headers: headers);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
-        return data['data']['orders'];
+        
+        // Return the data structure that matches your API response
+        return {
+          'orders': data['data']['orders'],
+          'pagination': data['data']['pagination'],
+        };
       } else {
         print('Failed to fetch orders: ${response.statusCode}');
         return null;
       }
     } catch (e) {
+      print('Error fetching paginated orders: $e');
+      return null;
+    }
+  }
+
+  // Keep the original method for backward compatibility
+  Future<List<dynamic>?> fetchAllOrders() async {
+    try {
+      final result = await fetchAllOrdersWithPagination(page: 1, perPage: 100);
+      return result?['orders'];
+    } catch (e) {
       print('Error fetching all orders: $e');
+      return null;
+    }
+  }
+
+  // Fetch orders with status filter and pagination
+  Future<Map<String, dynamic>?> fetchOrdersByStatus({
+    required String status,
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      
+      final uri = Uri.parse('$baseUrl/orders').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'perPage': perPage.toString(),
+          'status': status,
+        },
+      );
+      
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'orders': data['data']['orders'],
+          'pagination': data['data']['pagination'],
+        };
+      } else {
+        print('Failed to fetch orders by status: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching orders by status: $e');
       return null;
     }
   }
@@ -104,7 +164,6 @@ class OrderService {
         Uri.parse('$baseUrl/orders/$orderId'),
         headers: headers,
       );
-      print('Manoj:$response');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -119,7 +178,7 @@ class OrderService {
     }
   }
 
-  // Add this inside the OrderService class
+  // Cancel order
   Future<Map<String, dynamic>?> cancelOrder(String orderId) async {
     try {
       final headers = await _getAuthHeaders();
@@ -130,7 +189,6 @@ class OrderService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('data$data');
         return {
           'success': true,
           'message': data['message'],
@@ -153,6 +211,7 @@ class OrderService {
     }
   }
 
+  // Get refund details with pagination
   Future<Map<String, dynamic>?> getRefundDetails({
     String? status,
     String? orderId,
@@ -182,6 +241,41 @@ class OrderService {
       }
     } catch (e) {
       print('Error fetching refund details: $e');
+      return null;
+    }
+  }
+
+  // Search orders with pagination
+  Future<Map<String, dynamic>?> searchOrders({
+    required String query,
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      
+      final uri = Uri.parse('$baseUrl/orders/search').replace(
+        queryParameters: {
+          'q': query,
+          'page': page.toString(),
+          'perPage': perPage.toString(),
+        },
+      );
+      
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'orders': data['data']['orders'],
+          'pagination': data['data']['pagination'],
+        };
+      } else {
+        print('Failed to search orders: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error searching orders: $e');
       return null;
     }
   }

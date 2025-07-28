@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
@@ -9,16 +10,21 @@ import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:happy_farm/widgets/without_login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
 
   @override
-  State<WishlistScreen> createState() => _WishlistScreenState();
+  State<WishlistScreen> createState() => WishlistScreenState();
 }
 
-class _WishlistScreenState extends State<WishlistScreen>
-    with SingleTickerProviderStateMixin {
+class WishlistScreenState extends State<WishlistScreen>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  // Keep the screen alive to prevent unnecessary rebuilds
+  @override
+  bool get wantKeepAlive => true;
+
   late AnimationController _controller;
   List<Map<String, dynamic>> wishlist = [];
   bool _isLoggedIn = false;
@@ -34,7 +40,13 @@ class _WishlistScreenState extends State<WishlistScreen>
   bool _isLoading = false;
   bool _isLoadingMore = false;
   final int _perPage = 5;
-  
+
+  // Track if data has been loaded initially
+  bool _hasInitiallyLoaded = false;
+
+  // Track if we need to refresh data
+  bool _needsRefresh = false;
+
   final ScrollController _scrollController = ScrollController();
 
   // Enhanced color scheme
@@ -55,7 +67,8 @@ class _WishlistScreenState extends State<WishlistScreen>
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
       if (_hasNextPage && !_isLoadingMore) {
         _loadMoreWishlist();
       }
@@ -64,22 +77,29 @@ class _WishlistScreenState extends State<WishlistScreen>
 
   Future<void> _initializeScreen() async {
     await _checkLoginStatus();
-    if (_isLoggedIn) {
+    if (_isLoggedIn && !_hasInitiallyLoaded) {
       await _loadWishlist(page: 1, isRefresh: true);
+      _hasInitiallyLoaded = true;
     }
   }
 
-  Future<void> _checkLoginStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    final userId = prefs.getString('userId');
-
+  // Method to be called from outside when wishlist changes
+  void markForRefresh() {
     setState(() {
-      _isLoggedIn = token != null && userId != null;
+      _needsRefresh = true;
     });
   }
 
-  Future<void> _loadWishlist({required int page, bool isRefresh = false}) async {
+  // Method to refresh only when actually needed
+  Future<void> _refreshIfNeeded() async {
+    if (_needsRefresh && _isLoggedIn) {
+      await _loadWishlist(page: 1, isRefresh: true);
+      _needsRefresh = false;
+    }
+  }
+
+  Future<void> _loadWishlist(
+      {required int page, bool isRefresh = false}) async {
     if (!_isLoggedIn) return;
 
     setState(() {
@@ -96,10 +116,7 @@ class _WishlistScreenState extends State<WishlistScreen>
         perPage: _perPage,
       );
 
-      print('🔍 Wishlist response: $response'); // Debug log
-      
       final items = response['items'] ?? [];
-      print('📝 Items count: ${items.length}'); // Debug log
 
       setState(() {
         if (isRefresh) {
@@ -107,13 +124,13 @@ class _WishlistScreenState extends State<WishlistScreen>
         } else {
           wishlist.addAll(List<Map<String, dynamic>>.from(items));
         }
-        
+
         _currentPage = response['currentPage'] ?? 1;
         _totalPages = response['totalPages'] ?? 1;
         _totalItems = response['totalItems'] ?? 0;
         _hasNextPage = response['hasNextPage'] ?? false;
         _hasPrevPage = response['hasPrevPage'] ?? false;
-        
+
         _isLoading = false;
         _isLoadingMore = false;
       });
@@ -127,7 +144,7 @@ class _WishlistScreenState extends State<WishlistScreen>
         _isLoading = false;
         _isLoadingMore = false;
       });
-      
+
       if (mounted) {
         showErrorSnackbar(context, 'Error loading wishlist: $e');
       }
@@ -144,6 +161,30 @@ class _WishlistScreenState extends State<WishlistScreen>
     await _loadWishlist(page: 1, isRefresh: true);
   }
 
+  // Public method to refresh wishlist from external widgets
+  Future<void> refreshWishlist() async {
+    await _refreshWishlist();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Check if we need to refresh when screen becomes visible
+    if (_hasInitiallyLoaded) {
+      _refreshIfNeeded();
+    }
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final userId = prefs.getString('userId');
+
+    setState(() {
+      _isLoggedIn = token != null && userId != null;
+    });
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -153,6 +194,8 @@ class _WishlistScreenState extends State<WishlistScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -191,7 +234,8 @@ class _WishlistScreenState extends State<WishlistScreen>
       return WithoutLoginScreen(
         icon: Icons.favorite_border_outlined,
         title: 'Wishlist',
-        subText: 'Login to add products to your wishlist and manage your orders',
+        subText:
+            'Login to add products to your wishlist and manage your orders',
       );
     }
 
@@ -199,7 +243,7 @@ class _WishlistScreenState extends State<WishlistScreen>
       return const Center(child: WishlistShimmer());
     }
 
-    if (wishlist.isEmpty) {
+    if (wishlist.isEmpty && _hasInitiallyLoaded) {
       return _buildEmptyWishlist();
     }
 
@@ -213,7 +257,7 @@ class _WishlistScreenState extends State<WishlistScreen>
           if (index == wishlist.length) {
             return _buildLoadingIndicator();
           }
-          
+
           return _buildWishlistItem(index);
         },
       ),
@@ -221,49 +265,134 @@ class _WishlistScreenState extends State<WishlistScreen>
   }
 
   Widget _buildEmptyWishlist() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: veryLightGreen,
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: Icon(
-              Icons.favorite_border,
-              size: 60,
-              color: accentGreen,
+    return RefreshIndicator(
+      onRefresh: _refreshWishlist,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: veryLightGreen,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: Icon(
+                    Icons.favorite_border,
+                    size: 60,
+                    color: accentGreen,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Your wishlist is empty",
+                  style: TextStyle(
+                    fontSize: 20,
+                    color: textDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Start adding your favorite products",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: textMedium,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Pull down to refresh",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: textMedium.withOpacity(0.7),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            "Your wishlist is empty",
-            style: TextStyle(
-              fontSize: 20,
-              color: textDark,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Start adding your favorite products",
-            style: TextStyle(
-              fontSize: 16,
-              color: textMedium,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildLoadingIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: const Center(
-        child: CircularProgressIndicator(),
+    return Column(
+      children: List.generate(2, (index) => _buildShimmerCartItem()),
+    );
+  }
+
+  Widget _buildShimmerCartItem() {
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        vertical: 8,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey.shade300,
+          highlightColor: Colors.grey.shade100,
+          child: Row(
+            children: [
+              // Image shimmer
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Content shimmer
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product name shimmer
+                    Container(
+                      height: 16,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Price shimmer
+                    Container(
+                      height: 14,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Subtotal shimmer
+                    Container(
+                      height: 12,
+                      width: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -277,8 +406,10 @@ class _WishlistScreenState extends State<WishlistScreen>
     final image = (product['images'] != null && product['images'].isNotEmpty)
         ? product['images'][0]
         : null;
-
     final prices = product['prices'];
+    final stock = prices != null && prices is List && prices.isNotEmpty
+        ? (prices[0]['countInStock'] ?? 0)
+        : 0;
     final priceObj = (prices != null && prices.isNotEmpty) ? prices[0] : null;
     final priceValue = priceObj != null ? priceObj['actualPrice'] : 0.0;
 
@@ -296,15 +427,21 @@ class _WishlistScreenState extends State<WishlistScreen>
     return FadeTransition(
       opacity: animation,
       child: GestureDetector(
-        onTap: () {
+        onTap: () async {
           final productInstance = AllProduct.fromJson(product);
-          Navigator.of(context).push(
+          final result = await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (builder) => ProductDetails(
                 product: productInstance,
               ),
             ),
           );
+
+          // Check if wishlist was modified in product details
+          if (result == 'wishlist_updated') {
+            markForRefresh();
+            _refreshIfNeeded();
+          }
         },
         child: Card(
           elevation: 0,
@@ -317,26 +454,34 @@ class _WishlistScreenState extends State<WishlistScreen>
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.green[50],
-                    image: image != null
-                        ? DecorationImage(
-                            image: NetworkImage(image),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: image == null
-                      ? Icon(
-                          Icons.image_not_supported,
-                          color: Colors.grey[400],
-                          size: 40,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: image != null
+                      ? CachedNetworkImage(
+                          imageUrl: image,
+                          fit: BoxFit.cover,
+                          width: 100,
+                          height: 100,
+                          placeholder: (context, url) => Shimmer.fromColors(
+                            baseColor: Colors.grey.shade300,
+                            highlightColor: Colors.grey.shade100,
+                            child: Container(
+                              color: Colors.white,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Icon(
+                            Icons.error,
+                            color: Colors.grey[400],
+                            size: 40,
+                          ),
                         )
-                      : null,
+                      : Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: Colors.grey[400],
+                            size: 40,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -368,7 +513,7 @@ class _WishlistScreenState extends State<WishlistScreen>
                           color: Colors.green[800],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           ...List.generate(
@@ -392,6 +537,15 @@ class _WishlistScreenState extends State<WishlistScreen>
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        stock > 0 ? 'In Stock' : 'Out of Stock',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: stock > 0 ? Colors.green[800] : Colors.red,
+                        ),
                       ),
                     ],
                   ),
@@ -509,7 +663,8 @@ class _WishlistScreenState extends State<WishlistScreen>
       if (allSuccess) {
         showSuccessSnackbar(context, 'All items added to cart successfully');
       } else if (anyFailure) {
-        showSuccessSnackbar(context, 'Some items could not be added (maybe already in cart)');
+        showSuccessSnackbar(
+            context, 'Some items could not be added (maybe already in cart)');
       }
     }
   }

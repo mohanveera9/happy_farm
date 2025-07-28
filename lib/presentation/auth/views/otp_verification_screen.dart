@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:happy_farm/presentation/auth/views/onboard_screen.dart';
 import 'package:happy_farm/presentation/auth/widgets/custom_snackba_msg.dart';
 import 'package:happy_farm/presentation/main_screens/main_screen.dart';
@@ -7,6 +8,7 @@ import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/presentation/auth/services/user_service.dart';
 import 'package:happy_farm/models/user_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -31,9 +33,19 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   
   bool _isLoading = false;
   bool _isResending = false;
+  Timer? _resendTimer;
+  int _resendCountdown = 0;
+  static const int _resendTimeLimit = 120; // 2 minutes in seconds
+
+  @override
+  void initState() {
+    super.initState();
+    _checkResendTimer();
+  }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     for (var controller in _otpControllers) {
       controller.dispose();
     }
@@ -47,7 +59,58 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     return _otpControllers.map((controller) => controller.text).join();
   }
 
-  Future<void> _verifyOtp() async {
+  // Check if there's an active resend timer for this phone number
+  Future<void> _checkResendTimer() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'otp_resend_${widget.phoneNumber}';
+    final lastResendTime = prefs.getInt(key);
+    
+    if (lastResendTime != null) {
+      final currentTime = DateTime.now().millisecondsSinceEpoch;
+      final timeDifference = (currentTime - lastResendTime) ~/ 1000;
+      
+      if (timeDifference < _resendTimeLimit) {
+        setState(() {
+          _resendCountdown = _resendTimeLimit - timeDifference;
+        });
+        _startResendTimer();
+      } else {
+        // Timer has expired, remove the stored time
+        await prefs.remove(key);
+      }
+    }
+  }
+
+  // Start the resend countdown timer
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCountdown > 0) {
+        setState(() {
+          _resendCountdown--;
+        });
+      } else {
+        timer.cancel();
+        _clearResendTimer();
+      }
+    });
+  }
+
+  // Clear the resend timer from SharedPreferences
+  Future<void> _clearResendTimer() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'otp_resend_${widget.phoneNumber}';
+    await prefs.remove(key);
+  }
+
+  // Format countdown time as MM:SS
+  String _formatCountdown(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+Future<void> _verifyOtp() async {
     if (_otpCode.length != 6) {
       CustomSnackbar.showError(context, "Error", "Please enter complete OTP");
       return;
@@ -67,6 +130,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     if (result != null && result['error'] == null) {
+      // Clear the resend timer on successful verification
+      await _clearResendTimer();
+      
       final user = result['user'];
       
       // Check if user needs onboarding
@@ -99,6 +165,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   Future<void> _resendOtp() async {
+    if (_resendCountdown > 0) {
+      CustomSnackbar.showError(
+        context, 
+        "Please wait", 
+        "You can resend OTP after ${_formatCountdown(_resendCountdown)}"
+      );
+      return;
+    }
+
     setState(() {
       _isResending = true;
     });
@@ -112,6 +187,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     if (result != null && result['error'] == null) {
+      // Store the current time and start the timer
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'otp_resend_${widget.phoneNumber}';
+      await prefs.setInt(key, DateTime.now().millisecondsSinceEpoch);
+      
+      setState(() {
+        _resendCountdown = _resendTimeLimit;
+      });
+      _startResendTimer();
+
       CustomSnackbar.showSuccess(
           context, "Success", "OTP sent again to your phone number");
     } else {
@@ -226,11 +311,17 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   children: [
                     const Text("Didn't receive the code? "),
                     GestureDetector(
-                      onTap: _isResending ? null : _resendOtp,
+                      onTap: (_isResending || _resendCountdown > 0) ? null : _resendOtp,
                       child: Text(
-                        _isResending ? 'Resending...' : 'Resend OTP',
+                        _isResending 
+                            ? 'Resending...' 
+                            : _resendCountdown > 0 
+                                ? 'Resend in ${_formatCountdown(_resendCountdown)}'
+                                : 'Resend OTP',
                         style: TextStyle(
-                          color: _isResending ? Colors.grey : AppTheme.primaryColor,
+                          color: (_isResending || _resendCountdown > 0) 
+                              ? Colors.grey 
+                              : AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

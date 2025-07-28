@@ -12,11 +12,11 @@ class ProductService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     print("token:$token");
-    
+
     Map<String, String> headers = {
       'Content-Type': 'application/json',
     };
-    
+
     // Only add Authorization header if token is not null and not empty
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -24,7 +24,7 @@ class ProductService {
     } else {
       print("No token found, making request without authorization");
     }
-    
+
     return headers;
   }
 
@@ -209,23 +209,58 @@ class ProductService {
     String? catId,
     String? subCatId,
   }) async {
-    final queryParams = {
-      'rating': rating.toString(),
-      if (catId != null) 'catId': catId,
-      if (subCatId != null) 'subCatId': subCatId,
-    };
-    final uri =
-        Uri.parse('$baseUrl/rating').replace(queryParameters: queryParams);
-    final response = await http.get(
-      uri,
-    );
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonResponse = json.decode(response.body);
-      final List<dynamic> productsJson = jsonResponse['products'];
+    try {
+      // Build query parameters
+      final queryParams = <String, String>{};
 
-      return productsJson.map((item) => FilterProducts.fromJson(item)).toList();
-    } else {
-      throw Exception('Failed to load products');
+      if (rating != null) {
+        queryParams['rating'] = rating.toString();
+      }
+      if (catId != null) {
+        queryParams['catId'] = catId;
+      }
+      if (subCatId != null) {
+        queryParams['subCatId'] = subCatId;
+      }
+
+      final uri =
+          Uri.parse('$baseUrl/rating').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          // Add authentication headers if needed
+          // 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+
+        // Check if the expected structure exists
+        if (!jsonResponse.containsKey('data')) {
+          throw Exception('Invalid response structure: missing data field');
+        }
+
+        final List<dynamic> productsJson = jsonResponse['data'];
+
+        // Convert to FilterProducts objects
+        return productsJson
+            .map((item) => FilterProducts.fromJson(item))
+            .toList();
+      } else if (response.statusCode == 404) {
+        throw Exception('No products found with the specified rating');
+      } else if (response.statusCode == 400) {
+        throw Exception('Invalid request parameters');
+      } else {
+        throw Exception(
+            'Failed to load products: ${response.statusCode} - ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      // Log the error for debugging
+      print('Error in getProductsByRating: $e');
+      rethrow;
     }
   }
 
@@ -273,17 +308,20 @@ class ProductService {
         return AllProduct.fromJson(productData);
       } else if (response.statusCode == 404) {
         throw Exception('Product not found');
-      } else if (response.statusCode == 400 && response.body.contains('Invalid token')) {
+      } else if (response.statusCode == 400 &&
+          response.body.contains('Invalid token')) {
         // Handle invalid token by retrying without authorization
         print("Invalid token detected, retrying without authorization");
         return await _getProductByIdWithoutAuth(productId);
       } else if (response.statusCode == 401) {
         throw Exception('Authentication failed. Please log in again.');
       } else {
-        String errorMessage = 'Failed to load product. Server returned ${response.statusCode}: ${response.reasonPhrase}';
+        String errorMessage =
+            'Failed to load product. Server returned ${response.statusCode}: ${response.reasonPhrase}';
         try {
           final errorData = json.decode(response.body);
-          errorMessage = errorData['error'] ?? errorData['message'] ?? errorMessage;
+          errorMessage =
+              errorData['error'] ?? errorData['message'] ?? errorMessage;
         } catch (e) {
           // If error body is not JSON, use default message
         }

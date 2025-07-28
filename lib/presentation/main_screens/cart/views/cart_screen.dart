@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/cart/models/cart_model.dart';
 import 'package:happy_farm/presentation/main_screens/cart/views/checkout_screen.dart';
@@ -8,6 +9,7 @@ import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:happy_farm/widgets/without_login_screen.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({
@@ -282,11 +284,8 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildLoadMoreIndicator() {
     if (_isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
+      return Column(
+        children: List.generate(2, (index) => _buildShimmerCartItem()),
       );
     }
 
@@ -294,6 +293,75 @@ class _CartScreenState extends State<CartScreen> {
       children: [
         const SizedBox(height: 0),
       ],
+    );
+  }
+
+  Widget _buildShimmerCartItem() {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey.shade300,
+          highlightColor: Colors.grey.shade100,
+          child: Row(
+            children: [
+              // Image shimmer
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Content shimmer
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product name shimmer
+                    Container(
+                      height: 16,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Price shimmer
+                    Container(
+                      height: 14,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Subtotal shimmer
+                    Container(
+                      height: 12,
+                      width: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -333,11 +401,21 @@ class _CartScreenState extends State<CartScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  item.product.images.first,
+                child: CachedNetworkImage(
+                  imageUrl: item.product.images.first,
                   width: 80,
                   height: 80,
                   fit: BoxFit.cover,
+                  placeholder: (context, url) => Shimmer.fromColors(
+                    baseColor: Colors.grey.shade300,
+                    highlightColor: Colors.grey.shade100,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.white,
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Icon(Icons.error),
                 ),
               ),
               const SizedBox(width: 12),
@@ -525,9 +603,6 @@ class _CartScreenState extends State<CartScreen> {
           _paymentRow("Delivery Charges", "FREE"),
           const Divider(),
           _paymentRow("Total Amount", total, isBold: true),
-          const SizedBox(height: 6),
-          const Text("You saved ₹120 on this order",
-              style: TextStyle(color: AppTheme.primaryColor)),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:happy_farm/presentation/auth/views/otp_verification_screen.dart'
 import 'package:happy_farm/presentation/auth/widgets/custom_snackba_msg.dart';
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/presentation/auth/services/user_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PhoneInputScreen extends StatefulWidget {
   const PhoneInputScreen({Key? key}) : super(key: key);
@@ -16,14 +17,53 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   final UserService authService = UserService();
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
+  static const int _resendTimeLimit = 120; // 2 minutes in seconds
+
+  // Check if user needs to wait before requesting OTP again
+  Future<bool> _canRequestOtp(String phoneNumber) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'otp_resend_$phoneNumber';
+    final lastResendTime = prefs.getInt(key);
+    
+    if (lastResendTime != null) {
+      final currentTime = DateTime.now().millisecondsSinceEpoch;
+      final timeDifference = (currentTime - lastResendTime) ~/ 1000;
+      
+      if (timeDifference < _resendTimeLimit) {
+        final remainingTime = _resendTimeLimit - timeDifference;
+        final minutes = remainingTime ~/ 60;
+        final seconds = remainingTime % 60;
+        final timeText = minutes > 0 
+            ? '${minutes}m ${seconds}s' 
+            : '${seconds}s';
+        
+        CustomSnackbar.showError(
+          context, 
+          "Please wait", 
+          "You can request OTP again after $timeText"
+        );
+        return false;
+      } else {
+        // Timer has expired, remove the stored time
+        await prefs.remove(key);
+      }
+    }
+    return true;
+  }
 
   Future<void> _requestOtp() async {
+    final phoneNumber = _phoneController.text.trim();
+    
+    // Check if user can request OTP
+    final canRequest = await _canRequestOtp(phoneNumber);
+    if (!canRequest) return;
+
     setState(() {
       _isLoading = true;
     });
 
     final result = await authService.requestOtp(
-      phoneNumber: _phoneController.text.trim(),
+      phoneNumber: phoneNumber,
     );
 
     setState(() {
@@ -31,6 +71,11 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     });
 
     if (result != null && result['error'] == null) {
+      // Store the current time for timer management
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'otp_resend_$phoneNumber';
+      await prefs.setInt(key, DateTime.now().millisecondsSinceEpoch);
+
       CustomSnackbar.showSuccess(
           context, "Success", "OTP sent to your phone number");
 
@@ -38,7 +83,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => OtpVerificationScreen(
-            phoneNumber: _phoneController.text.trim(),
+            phoneNumber: phoneNumber,
           ),
         ),
       );

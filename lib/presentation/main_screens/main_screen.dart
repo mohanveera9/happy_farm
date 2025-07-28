@@ -15,7 +15,7 @@ import 'package:happy_farm/utils/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class MainScreen extends StatefulWidget { 
+class MainScreen extends StatefulWidget {
   final int selectedIndex;
   const MainScreen({Key? key, this.selectedIndex = 0}) : super(key: key);
 
@@ -29,25 +29,48 @@ class _MainScreenState extends State<MainScreen> {
   String? _userId;
   int _cartItemCount = 0;
   bool _isCartCountLoading = false;
+  bool _categoriesFetched = false; // Track if categories are already fetched
 
   Future<void> _fetchHomeData() async {
     setState(() {
       _isHomeDataLoading = true;
     });
     try {
-      final categories = await CategoryService.fetchCategories();
+      // Only fetch categories if not already fetched
+      if (!_categoriesFetched) {
+        final categories = await CategoryService.fetchCategories();
+        setState(() {
+          _categories = categories;
+          _categoriesFetched = true;
+        });
+      }
+      
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('userId');
       setState(() {
-        _categories = categories;
         _userId = userId;
       });
       await _fetchCartCount();
     } catch (e) {
+      debugPrint('Error fetching home data: $e');
     } finally {
       setState(() {
         _isHomeDataLoading = false;
       });
+    }
+  }
+
+  // Method to refresh other data without refetching categories
+  Future<void> _refreshHomeData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+      setState(() {
+        _userId = userId;
+      });
+      await _fetchCartCount();
+    } catch (e) {
+      debugPrint('Error refreshing home data: $e');
     }
   }
 
@@ -67,13 +90,14 @@ class _MainScreenState extends State<MainScreen> {
         _cartItemCount = cartCount;
       });
     } catch (e) {
+      debugPrint('Error fetching cart count: $e');
     } finally {
       setState(() {
         _isCartCountLoading = false;
       });
     }
   }
-  
+
   late int _selectedIndex;
   bool _isCheckingLogin = true;
   bool _isLoggedIn = false;
@@ -98,6 +122,7 @@ class _MainScreenState extends State<MainScreen> {
           username: userData['name'] ?? 'No Name',
           email: userData['email'] ?? 'No Email',
           phoneNumber: userData['phone'] ?? 'No Phone',
+          image: userData['image'] ?? 'No image'
         );
       }
     }
@@ -117,7 +142,28 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  final GlobalKey<WishlistScreenState> _wishlistKey =
+      GlobalKey<WishlistScreenState>();
+  final GlobalKey<OrdersScreenState> _ordersKey =
+      GlobalKey<OrdersScreenState>();
+
   void _onItemTapped(int index) {
+    // If switching to wishlist tab (index 2), refresh the data
+    if (index == 2 && _selectedIndex != 2) {
+      // Small delay to ensure the screen is built
+      Future.delayed(Duration(milliseconds: 0), () {
+        _wishlistKey.currentState?.refreshWishlist();
+      });
+    }
+
+    // If switching to orders tab (index 3), refresh the data
+    if (index == 3 && _selectedIndex != 3) {
+      // Small delay to ensure the screen is built
+      Future.delayed(Duration(milliseconds: 0), () {
+        _ordersKey.currentState?.refreshOrders();
+      });
+    }
+
     setState(() {
       _selectedIndex = index;
     });
@@ -130,7 +176,7 @@ class _MainScreenState extends State<MainScreen> {
         builder: (context) => CartScreen(),
       ),
     );
-    
+
     if (result == 'cart_updated') {
       await _fetchCartCount();
     }
@@ -140,15 +186,16 @@ class _MainScreenState extends State<MainScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProductDetails(product: product,),
+        builder: (context) => ProductDetails(
+          product: product,
+        ),
       ),
     );
-    
+
     if (result == 'cart_updated') {
       await _fetchCartCount();
     }
   }
-
 
   List<Widget> get _screens {
     return [
@@ -157,15 +204,15 @@ class _MainScreenState extends State<MainScreen> {
         userId: _userId,
         cartItemCount: _cartItemCount,
         isCartCountLoading: _isCartCountLoading,
-        onRefresh: _fetchHomeData,
+        onRefresh: _refreshHomeData, // Use refresh method that doesn't refetch categories
         isLoading: _isHomeDataLoading,
         onCartChanged: _fetchCartCount,
         onNavigateToCart: _navigateToCartScreen,
         onProductTap: _naviagateToProductDetailsScreen,
       ),
       const SearchScreen(),
-      const WishlistScreen(),
-      const OrdersScreen(),
+      WishlistScreen(key: _wishlistKey),
+      OrdersScreen(key: _ordersKey),
       const ProfileScreen(),
     ];
   }
@@ -198,6 +245,10 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             backgroundColor: Colors.white,
@@ -231,7 +282,7 @@ class _MainScreenState extends State<MainScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),
                 activeIcon: Icon(Icons.person),
-                label: 'Account',
+                label: 'Profile',
               ),
             ],
           ),

@@ -44,6 +44,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? userId;
   String? token;
 
+  static const Color accentGreen = Color(0xFF4CAF50);
+  static const Color veryLightGreen = Color(0xFFE8F5E8);
+  static const Color textDark = Color(0xFF2C3E50);
+  static const Color textMedium = Color(0xFF546E7A);
+
   @override
   void initState() {
     super.initState();
@@ -173,13 +178,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _handlePaymentError(PaymentFailureResponse response) async {
     final prefs = await SharedPreferences.getInstance();
-    final userId=prefs.getString('userId');
+    final userId = prefs.getString('userId');
     CustomSnackbar.showError(
         context, "Error", 'Payment failed:Please try again later');
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => CartScreen()),
-    );    
+    );
     _loadUserData();
     _fetchUserAddresses();
     _isLoading = false;
@@ -586,34 +591,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildEmptyAddress() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            "No saved addresses found.",
-            style: TextStyle(fontSize: 18),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const AddAddressScreen(
-                          existingAddress: null,
-                        )),
-              );
-              _fetchUserAddresses();
-            },
-            icon: const Icon(Icons.add),
-            label: const Text("Add New Address"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+    return RefreshIndicator(
+      onRefresh: _fetchUserAddresses,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: veryLightGreen,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: Icon(
+                    Icons.location_on_outlined,
+                    size: 60,
+                    color: accentGreen,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "No saved addresses found",
+                  style: TextStyle(
+                    fontSize: 20,
+                    color: textDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Add your delivery addresses for quick checkout",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: textMedium,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AddAddressScreen(
+                                existingAddress: null,
+                              )),
+                    );
+                    _fetchUserAddresses();
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text("Add New Address"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 14, horizontal: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Pull down to refresh",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: textMedium.withOpacity(0.7),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

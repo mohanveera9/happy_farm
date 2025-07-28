@@ -17,9 +17,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _formKey = GlobalKey<FormState>();
 
   bool _isFetching = true; // for first screen build
-  bool _isSaving   = false; // for Save button
+  bool _isSaving = false; // for Save button
 
-  final _nameController  = TextEditingController();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
@@ -28,9 +28,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     super.initState();
     final user = Provider.of<UserProvider>(context, listen: false).user;
 
-    _nameController.text  = user.username     ?? '';
-    _emailController.text = user.email        ?? '';
-    _phoneController.text = user.phoneNumber  ?? '';
+    _nameController.text = user.username ?? '';
+    _emailController.text = user.email ?? '';
+    _phoneController.text = user.phoneNumber ?? '';
 
     _isFetching = false; // done populating
   }
@@ -41,7 +41,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     setState(() => _isSaving = true);
 
     final result = await UserService().updatePersonalInfo(
-      name:  _nameController.text,
+      name: _nameController.text,
       email: _emailController.text,
       phone: _phoneController.text,
     );
@@ -54,11 +54,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       showSuccessSnackbar(context, 'Details updated successfully!');
       Provider.of<UserProvider>(context, listen: false).updateUserDetails(
         UserModel(
-          username:    result['user']['name'],
-          email:       result['user']['email'],
-          phoneNumber: result['user']['phone'],
-          image: result['user']['image']
-        ),
+            username: result['user']['name'],
+            email: result['user']['email'],
+            phoneNumber: result['user']['phone'],
+            image: result['user']['image']),
       );
     }
   }
@@ -91,8 +90,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       controller: _nameController,
                       icon: Icons.person,
                       label: 'Full Name',
-                      validator: (v) =>
-                          v!.isEmpty ? 'Enter name' : null,
+                      validator: (v) => v!.isEmpty ? 'Enter name' : null,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
@@ -102,15 +100,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) =>
                           v!.contains('@') ? null : 'Enter valid email',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _phoneController,
-                      icon: Icons.phone,
-                      label: 'Phone Number',
-                      keyboardType: TextInputType.phone,
-                      validator: (v) =>
-                          v!.length >= 10 ? null : 'Enter valid phone number',
                     ),
                     const SizedBox(height: 30),
                     ElevatedButton.icon(

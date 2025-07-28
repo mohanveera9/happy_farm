@@ -4,29 +4,40 @@ import 'package:happy_farm/presentation/main_screens/orders/services/order_servi
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/presentation/main_screens/orders/widgets/order_shimmer.dart';
 import 'package:happy_farm/widgets/without_login_screen.dart';
+import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
   @override
-  _OrdersScreenState createState() => _OrdersScreenState();
+  OrdersScreenState createState() => OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen>
+class OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   List orders = [];
   bool isLoading = true;
+  bool _isLoadingMore = false;
   bool _isLoggedIn = false;
   late TabController _tabController;
-  late Future<void> ordersFuture;
-  
+
+  // Pagination variables
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalOrders = 0;
+  bool _hasMoreOrders = true;
+  final int _perPage = 10;
+
+  late ScrollController _scrollController;
+
   // Enhanced color scheme
   static const Color accentGreen = Color(0xFF4CAF50);
   static const Color veryLightGreen = Color(0xFFE8F5E8);
   static const Color textDark = Color(0xFF2C3E50);
   static const Color textMedium = Color(0xFF546E7A);
-  
+
   final List<String> statusTabs = [
     'All',
     'pending',
@@ -39,16 +50,56 @@ class _OrdersScreenState extends State<OrdersScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: statusTabs.length, vsync: this);
-    ordersFuture = _initializeScreen();
+    _scrollController = ScrollController();
+    _setupScrollListener();
+    _initializeScreen();
+  }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        if (!_isLoadingMore && _hasMoreOrders && _currentPage < _totalPages) {
+          _loadMoreOrders();
+        }
+      }
+    });
   }
 
   Future<void> _initializeScreen() async {
     // Check login status first
     await _checkLoginStatus();
 
-    // Only load orders if user is logged in
+    // Load orders if user is logged in, otherwise just stop loading
     if (_isLoggedIn) {
       await fetchOrders();
+    } else {
+      // FIXED: Set loading to false when user is not logged in
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // Public method to refresh orders from MainScreen
+  Future<void> refreshOrders() async {
+    await _checkLoginStatus();
+    if (_isLoggedIn) {
+      setState(() {
+        orders = [];
+        _currentPage = 1;
+        _hasMoreOrders = true;
+        _isLoadingMore = false;
+        _totalPages = 1;
+        _totalOrders = 0;
+        isLoading = true;
+      });
+      await fetchOrders();
+    } else {
+      // FIXED: Also handle non-logged-in state in refresh
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -64,16 +115,14 @@ class _OrdersScreenState extends State<OrdersScreen>
 
   Future<void> fetchOrders() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('userId');
+      setState(() {
+        isLoading = true;
+      });
 
-      if (userId == null) {
-        print("User ID not found in SharedPreferences");
-        setState(() => isLoading = false);
-        return;
-      }
-
-      final response = await OrderService().fetchAllOrders();
+      final response = await OrderService().fetchAllOrdersWithPagination(
+        page: _currentPage,
+        perPage: _perPage,
+      );
 
       if (response == null) {
         print("No order data received");
@@ -81,20 +130,68 @@ class _OrdersScreenState extends State<OrdersScreen>
         return;
       }
 
-      final userOrders = response.toList();
-
       setState(() {
-        orders = userOrders;
+        orders = response['orders'] ?? [];
+        _totalPages = response['pagination']['totalPages'] ?? 1;
+        _totalOrders = response['pagination']['totalOrders'] ?? 0;
+        _hasMoreOrders = response['pagination']['hasNextPage'] ?? false;
         isLoading = false;
       });
     } catch (e) {
       setState(() => isLoading = false);
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to load orders');
+      }
+    }
+  }
+
+  Future<void> _loadMoreOrders() async {
+    if (_isLoadingMore || !_hasMoreOrders || _currentPage >= _totalPages) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = _currentPage + 1;
+
+      final response = await OrderService().fetchAllOrdersWithPagination(
+        page: nextPage,
+        perPage: _perPage,
+      );
+
+      if (response != null) {
+        final newOrders = response['orders'] ?? [];
+
+        setState(() {
+          if (newOrders.isNotEmpty) {
+            orders.addAll(newOrders);
+            _currentPage = nextPage;
+          }
+          _hasMoreOrders = response['pagination']['hasNextPage'] ?? false;
+          _isLoadingMore = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingMore = false;
+      });
+      if (mounted) {
+        showErrorSnackbar(context, 'Failed to load more orders');
+      }
     }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -110,119 +207,202 @@ class _OrdersScreenState extends State<OrdersScreen>
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
-      body: FutureBuilder<void>(
-        future: ordersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: OrderShimmer());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else {
-            // Check if user is not logged in
-            if (!_isLoggedIn) {
-              return WithoutLoginScreen(
-                icon: Icons.receipt_long_outlined,
-                title: 'My Orders',
-                subText: 'Login to view your orders and track your deliveries',
-              );
-            }
+      body: isLoading
+          ? Center(child: OrderShimmer())
+          : !_isLoggedIn
+              ? WithoutLoginScreen(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'My Orders',
+                  subText:
+                      'Login to view your orders and track your deliveries',
+                )
+              : Column(
+                  children: [
+                    Container(
+                      color: Colors.white,
+                      child: TabBar(
+                        controller: _tabController,
+                        labelColor: AppTheme.primaryColor,
+                        unselectedLabelColor: Colors.grey,
+                        indicatorColor: AppTheme.primaryColor,
+                        tabs: statusTabs
+                            .map((status) => Tab(text: status.capitalize()))
+                            .toList(),
+                      ),
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: statusTabs.map((status) {
+                          final filteredOrders = status == 'All'
+                              ? orders
+                              : orders
+                                  .where((o) =>
+                                      o['orderStatus']
+                                          .toString()
+                                          .toLowerCase() ==
+                                      status.toLowerCase())
+                                  .toList();
 
-            // User is logged in, show orders content
-            return Column(
-              children: [
-                Container(
-                  color: Colors.white,
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: AppTheme.primaryColor,
-                    unselectedLabelColor: Colors.grey,
-                    indicatorColor: AppTheme.primaryColor,
-                    tabs: statusTabs
-                        .map((status) => Tab(text: status.capitalize()))
-                        .toList(),
-                  ),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: statusTabs.map((status) {
-                      final filteredOrders = status == 'All'
-                          ? orders
-                          : orders
-                              .where((o) =>
-                                  o['orderStatus'].toString().toLowerCase() ==
-                                  status.toLowerCase())
-                              .toList();
+                          if (filteredOrders.isEmpty && !isLoading) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: veryLightGreen,
+                                      borderRadius: BorderRadius.circular(50),
+                                    ),
+                                    child: Icon(
+                                      Icons.inventory_2_outlined,
+                                      size: 60,
+                                      color: accentGreen,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    "No ${status.toLowerCase()} orders",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      color: textDark,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "You haven't placed any orders yet",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: textMedium,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
 
-                      if (filteredOrders.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: veryLightGreen,
-                                  borderRadius: BorderRadius.circular(50),
-                                ),
-                                child: Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 60,
-                                  color: accentGreen,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Text(
-                                "No ${status.toLowerCase()} orders",
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  color: textDark,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "You haven't placed any orders yet",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: textMedium,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        padding: EdgeInsets.all(10),
-                        itemCount: filteredOrders.length,
-                        itemBuilder: (context, index) {
-                          final order = filteredOrders[index];
-                          return OrderCard(
-                            order: order,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => OrderDetailsPage(
-                                      orderId: order['_id'].toString()),
-                                ),
-                              );
-                            },
+                          return RefreshIndicator(
+                            onRefresh: refreshOrders,
+                            child: ListView.builder(
+                              controller:
+                                  status == 'All' ? _scrollController : null,
+                              padding: EdgeInsets.all(10),
+                              itemCount: filteredOrders.length +
+                                  (status == 'All' && _hasMoreOrders ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (index < filteredOrders.length) {
+                                  final order = filteredOrders[index];
+                                  return OrderCard(
+                                    order: order,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              OrderDetailsPage(
+                                                  orderId:
+                                                      order['_id'].toString()),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                } else {
+                                  // Show loading indicator for more items
+                                  return _buildLoadMoreIndicator();
+                                }
+                              },
+                            ),
                           );
-                        },
-                      );
-                    }).toList(),
-                  ),
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            );
-          }
-        },
-      ),
     );
   }
+
+  Widget _buildLoadMoreIndicator() {
+    if (_isLoadingMore) {
+      return Column(
+        children: List.generate(2, (index) => _buildShimmerCartItem()),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+Widget _buildShimmerCartItem() {
+  return Card(
+    margin: const EdgeInsets.symmetric(
+      vertical: 8,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: BorderSide(color: Colors.grey.shade300),
+    ),
+    elevation: 0,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade300,
+        highlightColor: Colors.grey.shade100,
+        child: Row(
+          children: [
+            // Image shimmer
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content shimmer
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product name shimmer
+                  Container(
+                    height: 16,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Price shimmer
+                  Container(
+                    height: 14,
+                    width: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Subtotal shimmer
+                  Container(
+                    height: 12,
+                    width: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class OrderCard extends StatelessWidget {

@@ -33,6 +33,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   bool _isDefault = false;
   bool _isLocating = false;
   bool _issavingaddress = false;
+  String _cleanPhoneNumber(String input) {
+    // Remove everything except digits
+    final digitsOnly = input.replaceAll(RegExp(r'\D'), '');
+
+    // Return last 10 digits
+    return digitsOnly.length > 10
+        ? digitsOnly.substring(digitsOnly.length - 10)
+        : digitsOnly;
+  }
 
   @override
   void initState() {
@@ -41,7 +50,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     if (widget.existingAddress != null) {
       final addr = widget.existingAddress!;
       _nameController.text = addr['name'] ?? '';
-      _phoneController.text = addr['phoneNumber'] ?? '';
+      _phoneController.text = _cleanPhoneNumber(addr['phoneNumber'] ?? '');
       _emailController.text = addr['email'] ?? '';
       _address1Controller.text = addr['address'] ?? '';
       _cityController.text = addr['city'] ?? '';
@@ -50,6 +59,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       _landmarkController.text = addr['landmark'] ?? '';
       _addressType = addr['addressType'] ?? 'home';
       _isDefault = addr['isDefault'] == false;
+      print(_phoneController.text);
     } else {
       // Use post-frame callback to safely read Provider in initState
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -84,7 +94,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       final result = await addressService.createAddress(
         name: _nameController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber:_cleanPhoneNumber(_phoneController.text.trim()),
         email: _emailController.text.trim(), // <== added validator
         address:
             "${_address1Controller.text.trim()}, ${_address2Controller.text.trim()}",
@@ -99,14 +109,14 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       print('result:$result');
       if (result != null) {
         showSuccessSnackbar(context, "Address created successfully!");
-         Navigator.pop(context);
+        Navigator.pop(context);
       } else {
         showErrorSnackbar(context, "Failed to create address!");
-         Navigator.pop(context);
+        Navigator.pop(context);
       }
     } else {
-        showErrorSnackbar(context, "Please fill all required fields");
-         Navigator.pop(context);
+      showErrorSnackbar(context, "Please fill all required fields");
+      Navigator.pop(context);
     }
   }
 
@@ -118,7 +128,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       final result = await addressService.updateAddress(
         addressId: widget.existingAddress!['_id'],
         name: _nameController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber: _cleanPhoneNumber(_phoneController.text.trim()),
         email: _emailController.text.trim(),
         address:
             "${_address1Controller.text.trim()}, ${_address2Controller.text.trim()}",
@@ -132,12 +142,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       print('update result: $result');
       if (result != null) {
-        showSuccessSnackbar(context,"Address updated successfully!");
+        showSuccessSnackbar(context, "Address updated successfully!");
       } else {
         showErrorSnackbar(context, "Failed to update address!");
       }
     } else {
-        showErrorSnackbar(context,  "Please fill all required fields");
+      showErrorSnackbar(context, "Please fill all required fields");
     }
   }
 

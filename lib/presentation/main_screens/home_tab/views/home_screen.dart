@@ -1,5 +1,5 @@
-import 'package:happy_farm/presentation/main_screens/home_tab/widgets/shimmer_widget.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/widgets/featured_categorie_widget.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/category_drawer.dart';
+import 'package:happy_farm/presentation/main_screens/home_tab/widgets/home_content.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:happy_farm/presentation/auth/views/welcome_screen.dart';
@@ -8,15 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filter_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/filtered_products_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/views/productdetails_screen.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/widgets/auto_scroll_banner_widget.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/widgets/all_products_widget.dart';
-import 'package:happy_farm/presentation/main_screens/home_tab/widgets/featured_products_widget.dart';
 import 'package:happy_farm/presentation/main_screens/profile/widgets/custom_dialog.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import '../models/product_model.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/services/product_service.dart';
 
-enum HomePageView { home, menu, filtered }
+enum HomePageView { home, filtered, filter }
 
 class HomeScreen extends StatefulWidget {
   final List<CategoryModel> categories;
@@ -52,14 +49,51 @@ class _HomeScreenState extends State<HomeScreen>
   bool get wantKeepAlive => true;
 
   HomePageView _currentPage = HomePageView.home;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  // Filter related variables
+  List<FilterProducts> _filteredProducts = [];
+  String selectedCatId = '';
+  String selectedCatName = '';
+  String filteredCategoryName = '';
+  int? filteredminPrice;
+  int? filteredmaxPrice;
+  int? filteredrating;
+  int? _currentFilterRating;
+  
+  // Service and loading states
+  final _productService = ProductService();
+  bool isLoadingSearch = false;
 
-  void _onMenuTap() {
+  // Controllers
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<State<StatefulWidget>> _allProductsKey = GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _featuredProductsKey = GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _bannerKey = GlobalKey<State<StatefulWidget>>();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Navigation methods
+  void _openDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
+
+  void _onFilterTap() {
     setState(() {
-      _currentPage = HomePageView.menu;
+      _currentPage = HomePageView.filter;
     });
   }
 
-  void _onCloseMenu() {
+  void _onCloseFilter() {
     setState(() {
       selectedCatId = '';
       selectedCatName = '';
@@ -72,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  // Loader methods
   void _showLoader() {
     showDialog(
       context: context,
@@ -83,9 +118,7 @@ class _HomeScreenState extends State<HomeScreen>
           height: 80,
           child: Card(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(
-                Radius.circular(12),
-              ),
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
             elevation: 6,
             child: Padding(
@@ -102,49 +135,14 @@ class _HomeScreenState extends State<HomeScreen>
     if (Navigator.canPop(context)) Navigator.pop(context);
   }
 
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  List<FilterProducts> _filteredProducts = [];
-  String selectedCatId = '';
-  String selectedCatName = '';
-  bool isSearch = false;
-  final _productService = ProductService();
-  bool isLoadingSearch = false;
-  String filteredCategoryName = '';
-  int? filteredminPrice;
-  int? filteredmaxPrice;
-  int? filteredrating;
-  bool isCartCountLoading = false;
-
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey<State<StatefulWidget>> _allProductsKey =
-      GlobalKey<State<StatefulWidget>>();
-  final GlobalKey<State<StatefulWidget>> _featuredProductsKey =
-      GlobalKey<State<StatefulWidget>>();
-  final GlobalKey<State<StatefulWidget>> _bannerKey =
-      GlobalKey<State<StatefulWidget>>();
-
-  // Removed _isHomeContentInitialized logic
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
+  // Navigation to screens
   Future<void> _navigateToCartScreen() async {
     if (widget.onNavigateToCart != null) {
       await widget.onNavigateToCart!();
     } else {
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => CartScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => CartScreen()),
       );
     }
   }
@@ -155,31 +153,32 @@ class _HomeScreenState extends State<HomeScreen>
     } else {
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => ProductDetails(product: product),
-        ),
+        MaterialPageRoute(builder: (context) => ProductDetails(product: product)),
       );
     }
   }
 
+  // Filter methods
   Future<void> _fetchProductsByRating({
     required int rating,
     required String categoryId,
     required String categoryName,
   }) async {
-    setState(() {});
     _showLoader();
-
-    filteredCategoryName = categoryName;
-    filteredrating = rating;
 
     try {
       final products = await _productService.getProductsByRating(
         catId: categoryId,
         rating: rating,
       );
+
       if (products.isNotEmpty) {
         setState(() {
+          filteredCategoryName = categoryName;
+          filteredrating = rating;
+          _currentFilterRating = rating;
+          filteredminPrice = null;
+          filteredmaxPrice = null;
           _filteredProducts = products;
           _currentPage = HomePageView.filtered;
         });
@@ -190,7 +189,6 @@ class _HomeScreenState extends State<HomeScreen>
       showErrorSnackbar(context, '$e');
     } finally {
       _hideLoader();
-      setState(() {});
     }
   }
 
@@ -200,7 +198,6 @@ class _HomeScreenState extends State<HomeScreen>
     required String categoryId,
     required String categoryName,
   }) async {
-    setState(() {});
     _showLoader();
 
     filteredCategoryName = categoryName;
@@ -225,14 +222,11 @@ class _HomeScreenState extends State<HomeScreen>
       showErrorSnackbar(context, '$e');
     } finally {
       _hideLoader();
-      setState(() {});
     }
   }
 
   Future<void> _fetchProductsByCategory(String catName) async {
-    setState(() {});
     _showLoader();
-
     filteredCategoryName = catName;
 
     try {
@@ -241,30 +235,12 @@ class _HomeScreenState extends State<HomeScreen>
         _filteredProducts = products;
         _currentPage = HomePageView.filtered;
       });
+      // Close drawer after selection
+      Navigator.of(context).pop();
     } catch (e) {
       debugPrint('Error fetching category products: $e');
     } finally {
       _hideLoader();
-      setState(() {});
-    }
-  }
-
-  Widget _buildHomeContent() {
-    if (widget.isLoading) {
-      return const ShimmerHomeScreen();
-    } else {
-      return RefreshIndicator(
-        onRefresh: () async {
-          if (widget.onRefresh != null) {
-            await widget.onRefresh!();
-          }
-        },
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: _buildContentView(),
-        ),
-      );
     }
   }
 
@@ -274,17 +250,18 @@ class _HomeScreenState extends State<HomeScreen>
 
     return WillPopScope(
       onWillPop: () async {
+        if (_currentPage != HomePageView.home) {
+          _onCloseFilter();
+          return false;
+        }
+
         final shouldExit = await showDialog<bool>(
           context: context,
           builder: (context) => CustomConfirmDialog(
             title: "Are you sure?",
             message: "Do you really want to exit the app?",
-            onYes: () {
-              Navigator.of(context).pop(true);
-            },
-            onNo: () {
-              Navigator.of(context).pop(false);
-            },
+            onYes: () => Navigator.of(context).pop(true),
+            onNo: () => Navigator.of(context).pop(false),
             msg1: 'Cancel',
             msg2: 'Exit',
           ),
@@ -293,116 +270,38 @@ class _HomeScreenState extends State<HomeScreen>
         if (shouldExit == true) {
           SystemNavigator.pop();
         }
-
         return false;
       },
       child: Scaffold(
         key: _scaffoldKey,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 1,
-          automaticallyImplyLeading: false,
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: Icon(
-                  (_currentPage == HomePageView.menu ||
-                          _currentPage == HomePageView.filtered)
-                      ? Icons.close
-                      : Icons.filter_list,
-                  color: Colors.black87,
-                ),
-                onPressed: (_currentPage == HomePageView.menu ||
-                        _currentPage == HomePageView.filtered)
-                    ? _onCloseMenu
-                    : _onMenuTap,
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (builder) => WelcomeScreen(),
-                    ),
-                  );
-                },
-                child: Row(
-                  children: [
-                    Image.asset(
-                      'assets/images/sabba krish logo.png',
-                      width: 140,
-                      height: 70,
-                    ),
-                  ],
-                ),
-              ),
-              // Updated cart icon with loading state
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined,
-                        color: Colors.black87),
-                    onPressed: _navigateToCartScreen,
-                  ),
-                  if (widget.isCartCountLoading)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints:
-                            const BoxConstraints(minWidth: 20, minHeight: 20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2.0),
-                          child: const SizedBox(
-                            width: 8,
-                            height: 8,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (widget.cartItemCount > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints:
-                            const BoxConstraints(minWidth: 20, minHeight: 20),
-                        child: Text(
-                          '${widget.cartItemCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
+        appBar: _buildAppBar(),
+        drawer: CategoryDrawer(
+          categories: widget.categories,
+          onCategorySelected: _fetchProductsByCategory,
+          onFilterTap: _onFilterTap,
         ),
         backgroundColor: const Color(0xFFF5F5F5),
         body: SafeArea(
           child: IndexedStack(
             index: _currentPage.index,
             children: [
-              _buildHomeContent(),
+              HomeContent(
+                isLoading: widget.isLoading,
+                onRefresh: widget.onRefresh,
+                scrollController: _scrollController,
+                bannerKey: _bannerKey,
+                featuredProductsKey: _featuredProductsKey,
+                allProductsKey: _allProductsKey,
+                onProductTap: _navigateToProductDetailsScreen,
+                onCategorySelected: _fetchProductsByCategory,
+              ),
+              FilteredProductsScreen(
+                products: _filteredProducts,
+                categoryName: filteredCategoryName,
+                minPrice: filteredminPrice,
+                maxPrice: filteredmaxPrice,
+                rating: _currentFilterRating ?? filteredrating,
+              ),
               FilterScreen(
                 categories: widget.categories,
                 onCategorySelected: (categoryId, categoryName) {
@@ -448,14 +347,7 @@ class _HomeScreenState extends State<HomeScreen>
                     _fetchProductsByCategory(selectedCatName);
                   }
                 },
-                onClose: _onCloseMenu,
-              ),
-              FilteredProductsScreen(
-                products: _filteredProducts,
-                categoryName: filteredCategoryName,
-                minPrice: filteredminPrice,
-                maxPrice: filteredmaxPrice,
-                rating: filteredrating,
+                onClose: _onCloseFilter,
               ),
             ],
           ),
@@ -464,52 +356,91 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildContentView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AutoScrollBannerWidget(
-          key: _bannerKey,
-          height: 180.0,
-          autoScrollDuration: const Duration(seconds: 3),
-          margin: const EdgeInsets.all(16.0),
-          borderRadius: BorderRadius.circular(12.0),
-          onBannerTap: () {},
-        ),
-        _buildSectionTitle('Featured Categories'),
-        FeaturedCategoriesWidget(
-          onCategorySelected: (categoryName) {
-            _fetchProductsByCategory(categoryName);
-          },
-        ),
-        _buildSectionTitle('Featured Products'),
-        FeaturedProductsWidget(
-          key: _featuredProductsKey,
-          onProductTap: _navigateToProductDetailsScreen,
-          parentScrollController: _scrollController,
-          initialVisibleCount: 4,
-        ),
-        _buildSectionTitle('All Products'),
-        AllProductsWidget(
-          key: _allProductsKey,
-          onProductTap: _navigateToProductDetailsScreen,
-          parentScrollController: _scrollController,
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
+  AppBar _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 1,
+      automaticallyImplyLeading: false,
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: Icon(
+              (_currentPage == HomePageView.filtered || _currentPage == HomePageView.filter)
+                  ? Icons.close
+                  : Icons.menu,
+              color: Colors.black87,
+            ),
+            onPressed: (_currentPage == HomePageView.filtered || _currentPage == HomePageView.filter)
+                ? _onCloseFilter
+                : _openDrawer,
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (builder) => WelcomeScreen()),
+              );
+            },
+            child: Image.asset(
+              'assets/images/sabba krish logo.png',
+              width: 140,
+              height: 70,
+            ),
+          ),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
+                onPressed: _navigateToCartScreen,
+              ),
+              if (widget.isCartCountLoading)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: SizedBox(
+                        width: 8,
+                        height: 8,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else if (widget.cartItemCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    child: Text(
+                      '${widget.cartItemCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

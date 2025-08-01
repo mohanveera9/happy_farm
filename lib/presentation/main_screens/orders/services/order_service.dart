@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderService {
   static String? baseUrl = '${dotenv.env['BASE_URL']}';
-  
+
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -60,7 +60,7 @@ class OrderService {
       'razorpay_signature': razorpaySignature,
       'paymentHistoryId': orderId,
     });
-    
+
     final response = await http.post(
       Uri.parse('$baseUrl/payment/verify-order'),
       headers: headers,
@@ -78,28 +78,48 @@ class OrderService {
   // Enhanced fetch all orders with pagination support
   Future<Map<String, dynamic>?> fetchAllOrdersWithPagination({
     int page = 1,
-    int perPage = 10,
+    int perPage = 4,
   }) async {
     try {
       final headers = await _getAuthHeaders();
-      
+
       final uri = Uri.parse('$baseUrl/orders').replace(
         queryParameters: {
           'page': page.toString(),
           'perPage': perPage.toString(),
         },
       );
-      
+
       final response = await http.get(uri, headers: headers);
+      print('Orders ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
-        // Return the data structure that matches your API response
-        return {
-          'orders': data['data']['orders'],
-          'pagination': data['data']['pagination'],
-        };
+
+        // Check if the response has the expected structure
+        if (data != null && data['success'] == true && data['orders'] != null) {
+          final orders = data['orders'] as List;
+
+          // Since your API doesn't seem to return pagination info,
+          // we'll calculate it based on the response
+          final totalOrders = orders.length;
+          final hasNextPage =
+              orders.length == perPage; // Assume more if we got full page
+
+          return {
+            'orders': orders,
+            'pagination': {
+              'totalPages':
+                  data['totalPages'] ?? (hasNextPage ? page + 1 : page),
+              'totalOrders': data['totalOrders'] ?? totalOrders,
+              'hasNextPage': data['hasMore'] ?? hasNextPage,
+              'currentPage': data['currentPage'] ?? page,
+            },
+          };
+        } else {
+          print('Invalid response structure: ${data}');
+          return null;
+        }
       } else {
         print('Failed to fetch orders: ${response.statusCode}');
         return null;
@@ -129,7 +149,7 @@ class OrderService {
   }) async {
     try {
       final headers = await _getAuthHeaders();
-      
+
       final uri = Uri.parse('$baseUrl/orders').replace(
         queryParameters: {
           'page': page.toString(),
@@ -137,7 +157,7 @@ class OrderService {
           'status': status,
         },
       );
-      
+
       final response = await http.get(uri, headers: headers);
 
       if (response.statusCode == 200) {
@@ -253,7 +273,7 @@ class OrderService {
   }) async {
     try {
       final headers = await _getAuthHeaders();
-      
+
       final uri = Uri.parse('$baseUrl/orders/search').replace(
         queryParameters: {
           'q': query,
@@ -261,7 +281,7 @@ class OrderService {
           'perPage': perPage.toString(),
         },
       );
-      
+
       final response = await http.get(uri, headers: headers);
 
       if (response.statusCode == 200) {

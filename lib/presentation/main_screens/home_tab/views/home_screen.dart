@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   HomePageView _currentPage = HomePageView.home;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  
+
   // Filter related variables
   List<FilterProducts> _filteredProducts = [];
   String selectedCatId = '';
@@ -60,16 +60,19 @@ class _HomeScreenState extends State<HomeScreen>
   int? filteredmaxPrice;
   int? filteredrating;
   int? _currentFilterRating;
-  
+
   // Service and loading states
   final _productService = ProductService();
   bool isLoadingSearch = false;
 
   // Controllers
   final ScrollController _scrollController = ScrollController();
-  final GlobalKey<State<StatefulWidget>> _allProductsKey = GlobalKey<State<StatefulWidget>>();
-  final GlobalKey<State<StatefulWidget>> _featuredProductsKey = GlobalKey<State<StatefulWidget>>();
-  final GlobalKey<State<StatefulWidget>> _bannerKey = GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _allProductsKey =
+      GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _featuredProductsKey =
+      GlobalKey<State<StatefulWidget>>();
+  final GlobalKey<State<StatefulWidget>> _bannerKey =
+      GlobalKey<State<StatefulWidget>>();
 
   @override
   void initState() {
@@ -153,7 +156,8 @@ class _HomeScreenState extends State<HomeScreen>
     } else {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => ProductDetails(product: product)),
+        MaterialPageRoute(
+            builder: (context) => ProductDetails(product: product)),
       );
     }
   }
@@ -244,6 +248,27 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  Future<void> _fetchProductsBySubCategory(
+      String subCatId, String subCatName) async {
+    _showLoader();
+    filteredCategoryName = subCatName;
+
+    try {
+      final products = await _productService.getProductsBySubCateId(subCatId);
+      setState(() {
+        _filteredProducts = products;
+        _currentPage = HomePageView.filtered;
+      });
+      // Close drawer after selection
+      Navigator.of(context).pop();
+    } catch (e) {
+      debugPrint('Error fetching subcategory products: $e');
+      showErrorSnackbar(context, 'Failed to load subcategory products: $e');
+    } finally {
+      _hideLoader();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -278,6 +303,7 @@ class _HomeScreenState extends State<HomeScreen>
         drawer: CategoryDrawer(
           categories: widget.categories,
           onCategorySelected: _fetchProductsByCategory,
+          onSubCategorySelected: _fetchProductsBySubCategory, 
           onFilterTap: _onFilterTap,
         ),
         backgroundColor: const Color(0xFFF5F5F5),
@@ -366,12 +392,14 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           IconButton(
             icon: Icon(
-              (_currentPage == HomePageView.filtered || _currentPage == HomePageView.filter)
+              (_currentPage == HomePageView.filtered ||
+                      _currentPage == HomePageView.filter)
                   ? Icons.close
                   : Icons.menu,
               color: Colors.black87,
             ),
-            onPressed: (_currentPage == HomePageView.filtered || _currentPage == HomePageView.filter)
+            onPressed: (_currentPage == HomePageView.filtered ||
+                    _currentPage == HomePageView.filter)
                 ? _onCloseFilter
                 : _openDrawer,
           ),
@@ -390,7 +418,8 @@ class _HomeScreenState extends State<HomeScreen>
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
+                icon: const Icon(Icons.shopping_cart_outlined,
+                    color: Colors.black87),
                 onPressed: _navigateToCartScreen,
               ),
               if (widget.isCartCountLoading)
@@ -403,7 +432,8 @@ class _HomeScreenState extends State<HomeScreen>
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    constraints:
+                        const BoxConstraints(minWidth: 20, minHeight: 20),
                     child: const Padding(
                       padding: EdgeInsets.all(2.0),
                       child: SizedBox(
@@ -411,7 +441,8 @@ class _HomeScreenState extends State<HomeScreen>
                         height: 8,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       ),
                     ),
@@ -427,7 +458,8 @@ class _HomeScreenState extends State<HomeScreen>
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    constraints:
+                        const BoxConstraints(minWidth: 20, minHeight: 20),
                     child: Text(
                       '${widget.cartItemCount}',
                       style: const TextStyle(

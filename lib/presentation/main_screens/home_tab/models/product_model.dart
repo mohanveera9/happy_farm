@@ -7,7 +7,7 @@ abstract class BaseProduct {
   final List<PriceModel> prices;
   final String catName;
   final String? subCatName;
-  final int rating;
+  final double rating;
   final bool isFeatured;
   final bool isAddedToCart;
   final bool isAddedToWishlist;
@@ -96,7 +96,7 @@ class FeaturedProduct extends BaseProduct {
     required List<PriceModel> prices,
     required this.category,
     required this.subCategory,
-    required int rating,
+    required double rating,
     required bool isFeatured,
     required this.dateCreated,
     required isAddedToWishlist,
@@ -124,7 +124,7 @@ class FeaturedProduct extends BaseProduct {
           (json['prices'] as List).map((e) => PriceModel.fromJson(e)).toList(),
       category: json['catName'] ?? '',
       subCategory: json['subCatName'] ?? '',
-      rating: json['rating'] ?? 0,
+      rating: (json['rating'] ?? 0).toDouble(),
       isFeatured: json['isFeatured'] ?? false,
       isAddedToWishlist: json['isAddedToWishlist'] ?? false,
       isAddedToCart: json['isAddedToCart'] ?? false,
@@ -151,7 +151,7 @@ class AllProduct extends BaseProduct {
     String? subCatName,
     this.subCatId,
     this.subCat,
-    required int rating,
+    required double rating,
     required bool isFeatured,
     required isAddedToWishlist,
     required isAddedToCart,
@@ -186,7 +186,7 @@ class AllProduct extends BaseProduct {
       subCatName: subCatName,
       subCatId: json['subCatId'],
       subCat: json['subCat'],
-      rating: json['rating'] ?? 0,
+      rating: (json['rating'] ?? 0).toDouble(),
       isFeatured: json['isFeatured'] ?? false,
       isAddedToWishlist: json['isAddedToWishlist'] ?? false,
       isAddedToCart: json['isAddedToCart'] ?? false,
@@ -206,9 +206,11 @@ class FilterProducts extends BaseProduct {
     required List<PriceModel> prices,
     required String catName,
     String? subCatName,
-    required int rating,
+    required double rating,
     required bool isFeatured,
-    this.dateCreated, required isAddedToWishlist, required isAddedToCart,
+    this.dateCreated, 
+    required isAddedToWishlist, 
+    required isAddedToCart,
   }) : super(
           id: id,
           name: name,
@@ -237,7 +239,7 @@ class FilterProducts extends BaseProduct {
           (json['prices'] as List).map((e) => PriceModel.fromJson(e)).toList(),
       catName: json['catName'] ?? '',
       subCatName: subCatName,
-      rating: json['rating'] ?? 0,
+      rating: (json['rating'] ?? 0).toDouble(),
       isFeatured: json['isFeatured'] ?? false,
       isAddedToWishlist: json['isAddedToWishlist'] ?? false,
       isAddedToCart: json['isAddedToCart'] ?? false,
@@ -247,6 +249,7 @@ class FilterProducts extends BaseProduct {
     );
   }
 }
+
 // Category Model
 class CategoryModel {
   final String id;

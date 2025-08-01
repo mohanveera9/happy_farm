@@ -6,12 +6,14 @@ import 'package:shimmer/shimmer.dart';
 class CategoryDrawer extends StatefulWidget {
   final List<CategoryModel> categories;
   final Function(String) onCategorySelected;
+  final Function(String, String)? onSubCategorySelected; // New callback for subcategories
   final VoidCallback onFilterTap;
 
   const CategoryDrawer({
     Key? key,
     required this.categories,
     required this.onCategorySelected,
+    this.onSubCategorySelected,
     required this.onFilterTap,
   }) : super(key: key);
 
@@ -48,21 +50,23 @@ class _CategoryDrawerState extends State<CategoryDrawer> {
                       Icon(
                         Icons.category,
                         color: Colors.white,
-                        size: 32,
                       ),
                       SizedBox(width: 8),
                       Text(
                         'Categories',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
                   IconButton(
-                    onPressed: widget.onFilterTap,
+                    onPressed: () {
+                      widget.onFilterTap();
+                      Navigator.of(context).pop();
+                    },
                     icon: Icon(
                       Icons.filter_list,
                       color: Colors.white,
@@ -84,7 +88,7 @@ class _CategoryDrawerState extends State<CategoryDrawer> {
                   return Card(
                     margin:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    elevation: 2,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -171,7 +175,12 @@ class _CategoryDrawerState extends State<CategoryDrawer> {
                                     color: Colors.grey,
                                   ),
                                   onTap: () {
-                                    widget.onCategorySelected(subCategory.name);
+                                    // Call subcategory callback if available, otherwise fallback to category callback
+                                    if (widget.onSubCategorySelected != null) {
+                                      widget.onSubCategorySelected!(subCategory.id, subCategory.name);
+                                    } else {
+                                      widget.onCategorySelected(subCategory.name);
+                                    }
                                   },
                                 );
                               }).toList(),

@@ -8,7 +8,8 @@ class RefundDetailsScreen extends StatelessWidget {
   const RefundDetailsScreen({super.key, required this.refundData});
 
   String formatDate(String isoDate) {
-    final dateTime = DateTime.parse(isoDate);
+    print(isoDate);
+    final dateTime = DateTime.parse(isoDate).toLocal();
     return DateFormat('MMM d, yyyy, h:mm a').format(dateTime);
   }
 

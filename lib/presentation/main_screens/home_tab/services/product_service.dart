@@ -35,6 +35,8 @@ class ProductService {
 
     final response = await http.get(uri);
 
+    print(response.body);
+
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
 
@@ -374,6 +376,57 @@ class ProductService {
     } catch (e) {
       print('Error in _getProductByIdWithoutAuth: $e');
       rethrow;
+    }
+  }
+
+  Future<List<FilterProducts>> getProductsBySubCateId(String subCatId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://api.sabbafarm.com/api/products/subCatId?subCatId=$subCatId'),
+        headers: {
+          'Content-Type': 'application/json',
+          // Add any required authentication headers here
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> productsJson = data['products'] ?? [];
+
+        List<FilterProducts> products = [];
+
+        for (var productJson in productsJson) {
+          try {
+            // Manually create FilterProducts with proper defaults for missing fields
+            final Map<String, dynamic> processedJson =
+                Map<String, dynamic>.from(productJson);
+
+            // Add missing required fields with defaults
+            processedJson['description'] = processedJson['description'] ?? '';
+            processedJson['catName'] =
+                processedJson['catName'] ?? 'Unknown Category';
+            processedJson['subCatName'] = processedJson['subCatName'] ?? null;
+
+            // Convert the product JSON to FilterProducts
+            final product = FilterProducts.fromJson(processedJson);
+            products.add(product);
+          } catch (e) {
+            print('Error parsing individual product: $e');
+            print('Product JSON: $productJson');
+            // Continue with other products even if one fails
+            continue;
+          }
+        }
+
+        return products;
+      } else {
+        throw Exception(
+            'Failed to load subcategory products: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Service error: $e');
+      throw Exception('Error fetching subcategory products: $e');
     }
   }
 }

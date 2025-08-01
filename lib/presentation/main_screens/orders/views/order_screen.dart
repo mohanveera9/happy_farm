@@ -7,7 +7,6 @@ import 'package:happy_farm/widgets/without_login_screen.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shimmer/shimmer.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -25,10 +24,8 @@ class OrdersScreenState extends State<OrdersScreen>
 
   // Pagination variables
   int _currentPage = 1;
-  int _totalPages = 1;
-  int _totalOrders = 0;
   bool _hasMoreOrders = true;
-  final int _perPage = 10;
+  final int _perPage = 10; // Increased for better UX
 
   late ScrollController _scrollController;
 
@@ -59,7 +56,7 @@ class OrdersScreenState extends State<OrdersScreen>
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
-        if (!_isLoadingMore && _hasMoreOrders && _currentPage < _totalPages) {
+        if (!_isLoadingMore && _hasMoreOrders) {
           _loadMoreOrders();
         }
       }
@@ -67,40 +64,37 @@ class OrdersScreenState extends State<OrdersScreen>
   }
 
   Future<void> _initializeScreen() async {
-    // Check login status first
     await _checkLoginStatus();
 
-    // Load orders if user is logged in, otherwise just stop loading
     if (_isLoggedIn) {
       await fetchOrders();
     } else {
-      // FIXED: Set loading to false when user is not logged in
       setState(() {
         isLoading = false;
       });
     }
   }
 
-  // Public method to refresh orders from MainScreen
   Future<void> refreshOrders() async {
     await _checkLoginStatus();
     if (_isLoggedIn) {
-      setState(() {
-        orders = [];
-        _currentPage = 1;
-        _hasMoreOrders = true;
-        _isLoadingMore = false;
-        _totalPages = 1;
-        _totalOrders = 0;
-        isLoading = true;
-      });
+      _resetPagination();
       await fetchOrders();
     } else {
-      // FIXED: Also handle non-logged-in state in refresh
       setState(() {
         isLoading = false;
       });
     }
+  }
+
+  void _resetPagination() {
+    setState(() {
+      orders = [];
+      _currentPage = 1;
+      _hasMoreOrders = true;
+      _isLoadingMore = false;
+      isLoading = true;
+    });
   }
 
   Future<void> _checkLoginStatus() async {
@@ -126,19 +120,31 @@ class OrdersScreenState extends State<OrdersScreen>
 
       if (response == null) {
         print("No order data received");
-        setState(() => isLoading = false);
+        setState(() {
+          isLoading = false;
+          _hasMoreOrders = false;
+        });
         return;
       }
 
+      final newOrders = response['orders'] ?? [];
+      
       setState(() {
-        orders = response['orders'] ?? [];
-        _totalPages = response['pagination']['totalPages'] ?? 1;
-        _totalOrders = response['pagination']['totalOrders'] ?? 0;
-        _hasMoreOrders = response['pagination']['hasNextPage'] ?? false;
+        if (_currentPage == 1) {
+          orders = newOrders;
+        } else {
+          orders.addAll(newOrders);
+        }
+        
+        // Better logic for determining if there are more orders
+        _hasMoreOrders = newOrders.length == _perPage;
         isLoading = false;
       });
     } catch (e) {
-      setState(() => isLoading = false);
+      setState(() {
+        isLoading = false;
+        _hasMoreOrders = false;
+      });
       if (mounted) {
         showErrorSnackbar(context, 'Failed to load orders');
       }
@@ -146,7 +152,7 @@ class OrdersScreenState extends State<OrdersScreen>
   }
 
   Future<void> _loadMoreOrders() async {
-    if (_isLoadingMore || !_hasMoreOrders || _currentPage >= _totalPages) {
+    if (_isLoadingMore || !_hasMoreOrders) {
       return;
     }
 
@@ -169,18 +175,23 @@ class OrdersScreenState extends State<OrdersScreen>
           if (newOrders.isNotEmpty) {
             orders.addAll(newOrders);
             _currentPage = nextPage;
+            // If we got fewer orders than requested, no more pages
+            _hasMoreOrders = newOrders.length == _perPage;
+          } else {
+            _hasMoreOrders = false;
           }
-          _hasMoreOrders = response['pagination']['hasNextPage'] ?? false;
           _isLoadingMore = false;
         });
       } else {
         setState(() {
           _isLoadingMore = false;
+          _hasMoreOrders = false;
         });
       }
     } catch (e) {
       setState(() {
         _isLoadingMore = false;
+        _hasMoreOrders = false;
       });
       if (mounted) {
         showErrorSnackbar(context, 'Failed to load more orders');
@@ -225,6 +236,7 @@ class OrdersScreenState extends State<OrdersScreen>
                         labelColor: AppTheme.primaryColor,
                         unselectedLabelColor: Colors.grey,
                         indicatorColor: AppTheme.primaryColor,
+                        isScrollable: true,
                         tabs: statusTabs
                             .map((status) => Tab(text: status.capitalize()))
                             .toList(),
@@ -245,43 +257,7 @@ class OrdersScreenState extends State<OrdersScreen>
                                   .toList();
 
                           if (filteredOrders.isEmpty && !isLoading) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(24),
-                                    decoration: BoxDecoration(
-                                      color: veryLightGreen,
-                                      borderRadius: BorderRadius.circular(50),
-                                    ),
-                                    child: Icon(
-                                      Icons.inventory_2_outlined,
-                                      size: 60,
-                                      color: accentGreen,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    "No ${status.toLowerCase()} orders",
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      color: textDark,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    "You haven't placed any orders yet",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: textMedium,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            );
+                            return _buildEmptyState(status);
                           }
 
                           return RefreshIndicator(
@@ -291,7 +267,7 @@ class OrdersScreenState extends State<OrdersScreen>
                                   status == 'All' ? _scrollController : null,
                               padding: EdgeInsets.all(10),
                               itemCount: filteredOrders.length +
-                                  (status == 'All' && _hasMoreOrders ? 1 : 0),
+                                  (status == 'All' && (_hasMoreOrders || _isLoadingMore) ? 1 : 0),
                               itemBuilder: (context, index) {
                                 if (index < filteredOrders.length) {
                                   final order = filteredOrders[index];
@@ -310,7 +286,6 @@ class OrdersScreenState extends State<OrdersScreen>
                                     },
                                   );
                                 } else {
-                                  // Show loading indicator for more items
                                   return _buildLoadMoreIndicator();
                                 }
                               },
@@ -324,85 +299,93 @@ class OrdersScreenState extends State<OrdersScreen>
     );
   }
 
+  Widget _buildEmptyState(String status) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: veryLightGreen,
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: Icon(
+              Icons.inventory_2_outlined,
+              size: 60,
+              color: accentGreen,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "No ${status.toLowerCase()} orders",
+            style: TextStyle(
+              fontSize: 20,
+              color: textDark,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            status == 'All' 
+                ? "You haven't placed any orders yet"
+                : "No orders with ${status.toLowerCase()} status",
+            style: TextStyle(
+              fontSize: 16,
+              color: textMedium,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLoadMoreIndicator() {
     if (_isLoadingMore) {
-      return Column(
-        children: List.generate(2, (index) => _buildShimmerCartItem()),
-      );
-    }
-    return const SizedBox.shrink();
-  }
-}
-
-Widget _buildShimmerCartItem() {
-  return Card(
-    margin: const EdgeInsets.symmetric(
-      vertical: 8,
-    ),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: BorderSide(color: Colors.grey.shade300),
-    ),
-    elevation: 0,
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Shimmer.fromColors(
-        baseColor: Colors.grey.shade300,
-        highlightColor: Colors.grey.shade100,
+      return Container(
+        padding: const EdgeInsets.all(16),
+        alignment: Alignment.center,
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Image shimmer
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             ),
             const SizedBox(width: 12),
-            // Content shimmer
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Product name shimmer
-                  Container(
-                    height: 16,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Price shimmer
-                  Container(
-                    height: 14,
-                    width: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Subtotal shimmer
-                  Container(
-                    height: 12,
-                    width: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
+            Text(
+              'Loading more orders...',
+              style: TextStyle(
+                color: textMedium,
+                fontSize: 14,
               ),
             ),
           ],
         ),
-      ),
-    ),
-  );
+      );
+    }
+    
+    if (!_hasMoreOrders && orders.isNotEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        alignment: Alignment.center,
+        child: Text(
+          'No more orders to load',
+          style: TextStyle(
+            color: textMedium,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+    
+    return const SizedBox.shrink();
+  }
 }
 
 class OrderCard extends StatelessWidget {
@@ -472,11 +455,14 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    order['orderId'].toString(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Expanded(
+                    child: Text(
+                      order['orderId'].toString(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
@@ -491,6 +477,7 @@ class OrderCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           _getStatusIcon(order['orderStatus'] ?? ''),
@@ -543,23 +530,26 @@ class OrderCard extends StatelessWidget {
 
 Widget _orderInfoTile(String title, String value,
     {Color color = Colors.black87, bool isBold = false}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: const TextStyle(fontSize: 12, color: Colors.grey),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        value,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-          color: color,
+  return Flexible(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
-      ),
-    ],
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: color,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    ),
   );
 }
 

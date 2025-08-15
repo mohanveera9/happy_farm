@@ -4,6 +4,7 @@ class CartItem {
   final String userId;
   final int quantity;
   final double subTotal;
+  final int stock; // <-- Added stock
   final Product product;
 
   CartItem({
@@ -12,21 +13,29 @@ class CartItem {
     required this.userId,
     required this.quantity,
     required this.subTotal,
+    required this.stock,
     required this.product,
   });
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
+    final product = Product.fromJson(json['productId']);
+
+    // Find the matching price by priceId to get stock
+    final matchingPrice = product.prices.firstWhere(
+        (p) => p.id == json['priceId'],
+        orElse: () => product.prices.first);
+
     return CartItem(
       id: json['_id'],
       priceId: json['priceId'],
       userId: json['userId'],
       quantity: json['quantity'],
       subTotal: (json['subTotal'] as num).toDouble(),
-      product: Product.fromJson(json['productId']),
+      stock: matchingPrice.countInStock, // <-- stock from price
+      product: product,
     );
   }
 }
-
 
 class Product {
   final String id;

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:happy_farm/presentation/auth/views/phone_input_screen.dart';
 import 'package:happy_farm/presentation/main_screens/home_tab/models/product_model.dart';
@@ -12,6 +13,9 @@ import 'package:happy_farm/widgets/custom_dialog.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:html/parser.dart' show parse;
+import 'package:html/dom.dart' as dom;
+
 
 class ProductDetails extends StatefulWidget {
   final dynamic product;
@@ -481,27 +485,22 @@ class _ProductDetailsState extends State<ProductDetails> {
           height: 400,
           child: PageView.builder(
             itemCount: getProductImages().length,
-            itemBuilder: (context, index) => Image.network(
-              getProductImages()[index],
+            itemBuilder: (context, index) => CachedNetworkImage(
+              imageUrl: getProductImages()[index],
               fit: BoxFit.cover,
               width: double.infinity,
-              errorBuilder: (context, error, stackTrace) {
-                return const Center(
-                  child: Text('Image could not be loaded',
-                      style: TextStyle(color: Colors.grey)),
-                );
-              },
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
+              errorWidget: (context, url, error) => const Center(
+                child: Text(
+                  'Image could not be loaded',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              progressIndicatorBuilder: (context, url, downloadProgress) =>
+                  Center(
+                child: CircularProgressIndicator(
+                  value: downloadProgress.progress,
+                ),
+              ),
             ),
           ),
         ),
@@ -731,6 +730,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+// Updated _buildInfoCards function
   Widget _buildInfoCards() {
     return Column(
       children: [
@@ -761,57 +761,160 @@ class _ProductDetailsState extends State<ProductDetails> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: getProductDescription()?.trim().isNotEmpty == true
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: getProductDescription()!
-                              .split('\n')
-                              .where((line) => line.trim().isNotEmpty)
-                              .map((line) {
-                            if (line.toLowerCase().contains("features") ||
-                                line.toLowerCase().contains("benefits") ||
-                                line.toLowerCase().contains("crops") ||
-                                line.toLowerCase().contains("target pest") ||
-                                line.toLowerCase().contains("dosage") ||
-                                line.toLowerCase().contains("mode of action") ||
-                                line.toLowerCase().contains("application")) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.only(top: 12.0, bottom: 6),
-                                child: Text(
-                                  line.trim(),
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              );
-                            } else {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 4.0),
-                                child: Text(
-                                  line.trim(),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    color: Colors.black87,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              );
-                            }
-                          }).toList(),
-                        )
-                      : const Text(
-                          "No description available.",
-                          style: TextStyle(fontSize: 15, color: Colors.black87),
-                        ),
+                  child: _buildDescriptionContent(),
                 ),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+// Helper function to parse and display HTML content
+  Widget _buildDescriptionContent() {
+    final description = getProductDescription();
+
+    if (description?.trim().isEmpty != false) {
+      return const Text(
+        "No description available.",
+        style: TextStyle(fontSize: 15, color: Colors.black87),
+      );
+    }
+
+    // Check if content contains HTML tags
+    if (description!.contains('<') && description.contains('>')) {
+      return _buildHtmlContent(description);
+    } else {
+      return _buildPlainTextContent(description);
+    }
+  }
+
+// Function to handle HTML content
+  Widget _buildHtmlContent(String htmlContent) {
+    try {
+      // Parse HTML content
+      final document = parse(htmlContent);
+      final List<Widget> widgets = [];
+
+      // Extract text from HTML and create widgets
+      for (var element in document.body?.children ?? []) {
+        final text = _extractTextFromElement(element).trim();
+        if (text.isNotEmpty) {
+          widgets.add(_createTextWidget(text));
+        }
+      }
+
+      // If no structured content found, parse as plain text
+      if (widgets.isEmpty) {
+        final plainText = document.body?.text ?? htmlContent;
+        return _buildPlainTextContent(plainText);
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: widgets,
+      );
+    } catch (e) {
+      // Fallback to plain text if HTML parsing fails
+      final plainText = htmlContent
+          .replaceAll(RegExp(r'<[^>]*>'), '')
+          .replaceAll('&nbsp;', ' ');
+      return _buildPlainTextContent(plainText);
+    }
+  }
+
+// Function to extract text from HTML elements
+  String _extractTextFromElement(dom.Element element) {
+    return element.text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+// Function to handle plain text content
+  Widget _buildPlainTextContent(String content) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: content
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .map((line) => _createTextWidget(line.trim()))
+          .toList(),
+    );
+  }
+
+// Function to create text widgets with appropriate styling
+  Widget _createTextWidget(String text) {
+    // Check for key sections that should be bold
+    final keyWords = [
+      'name',
+      'form factor',
+      'features',
+      'benefits',
+      'crops',
+      'target pest',
+      'dosage',
+      'mode of action',
+      'application',
+      'specifications',
+      'usage',
+      'ingredients'
+    ];
+
+    bool isHeader = keyWords.any((keyword) =>
+        text.toLowerCase().contains(keyword.toLowerCase() + ':') ||
+        text.toLowerCase().startsWith(keyword.toLowerCase()));
+
+    // Special handling for "Name:" and "Form Factor:" entries
+    if (text.contains(':')) {
+      final parts = text.split(':');
+      if (parts.length >= 2) {
+        final label = parts[0].trim();
+        final value = parts.sublist(1).join(':').trim();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: isHeader ? 12.0 : 0,
+        bottom: isHeader ? 6.0 : 4.0,
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: isHeader ? 16 : 15,
+          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+          color: isHeader ? Colors.black : Colors.black87,
+          height: 1.4,
+        ),
+      ),
     );
   }
 

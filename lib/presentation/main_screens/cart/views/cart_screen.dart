@@ -200,6 +200,10 @@ class _CartScreenState extends State<CartScreen> {
     return _cartItems.fold(0, (sum, item) => sum + item.subTotal.toInt());
   }
 
+  bool _hasOutOfStockItems() {
+    return _cartItems.any((item) => item.stock == 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -379,6 +383,7 @@ class _CartScreenState extends State<CartScreen> {
     int itemIndex = _cartItems.indexOf(item);
     int countInStock = item.product.prices.first.countInStock;
     double actualPrice = item.product.prices.first.actualPrice;
+    bool isInStock = item.stock > 0;
 
     return GestureDetector(
       onTap: () {
@@ -437,6 +442,15 @@ class _CartScreenState extends State<CartScreen> {
                     Text(
                       "Subtotal: ₹${item.subTotal.toStringAsFixed(2)}",
                       style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isInStock ? "In Stock" : "Out of Stock",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isInStock ? AppTheme.primaryColor : Colors.red,
+                      ),
                     ),
                   ],
                 ),
@@ -500,10 +514,11 @@ class _CartScreenState extends State<CartScreen> {
                                     CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.remove_circle_outline),
-                        color: item.quantity == 1
+                        color: (item.quantity == 1 || !isInStock)
                             ? Colors.grey
-                            : AppTheme.primaryColor,
+                            : Colors.red,
                         onPressed: (item.quantity == 1 ||
+                                !isInStock ||
                                 _updatingRemove.contains(item.id))
                             ? null
                             : () async {
@@ -541,10 +556,11 @@ class _CartScreenState extends State<CartScreen> {
                                     CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.add_circle_outline),
-                        color: item.quantity == countInStock
+                        color: (item.quantity == countInStock || !isInStock)
                             ? Colors.grey
-                            : Colors.deepOrange,
+                            : AppTheme.primaryColor,
                         onPressed: (item.quantity == countInStock ||
+                                !isInStock ||
                                 _updatingAdd.contains(item.id))
                             ? null
                             : () async {
@@ -585,7 +601,6 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildPaymentDetails(int itemCount, int total) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -632,6 +647,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildBottomBar(int total) {
+    bool hasOutOfStockItems = _hasOutOfStockItems();
+    
     return SafeArea(
       child: Container(
         height: 60,
@@ -643,24 +660,32 @@ class _CartScreenState extends State<CartScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            RichText(
-              text: TextSpan(
-                text: "₹$total\n",
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "₹$total",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                children: const [
-                  TextSpan(
-                    text: "View price details",
+                if (hasOutOfStockItems)
+                  const Text(
+                    "Some items are out of stock",
+                    style: TextStyle(fontSize: 10, color: Colors.red),
+                  )
+                else
+                  const Text(
+                    "View price details",
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                ],
-              ),
+              ],
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: hasOutOfStockItems ? null : () {
                 final totalAmount = _cartItems.fold(
                     0, (sum, item) => sum + item.subTotal.toInt());
                 Navigator.push(
@@ -674,16 +699,16 @@ class _CartScreenState extends State<CartScreen> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
+                backgroundColor: hasOutOfStockItems ? Colors.grey : AppTheme.primaryColor,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
-                "Proceed",
-                style: TextStyle(color: Colors.white),
+              child: Text(
+                hasOutOfStockItems ? "Out of Stock" : "Proceed",
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ],

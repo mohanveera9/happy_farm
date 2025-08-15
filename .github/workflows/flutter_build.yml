@@ -1,16 +1,15 @@
-name: Build and Release Flutter APK
+name: Build and Release Flutter APK & AAB
 
 on:
   push:
     tags:
-      - 'v*'  # e.g., v1.0.0, v2.1.3
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build and Release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -22,9 +21,6 @@ jobs:
         with:
           flutter-version: '3.22.1'
 
-      - name: Confirm Flutter & Dart version
-        run: flutter --version
-
       - name: Install dependencies
         run: flutter pub get
 
@@ -35,7 +31,6 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      # 🔑 Decode keystore and create key.properties
       - name: Prepare release keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-key.jks
@@ -47,18 +42,16 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
-      - name: Upload APK to GitHub Releases
+      - name: Build release AAB
+        run: flutter build appbundle --release
+
+      - name: Upload APK & AAB to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           name: "🚀 Release ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
-          body: |
-            🎉 A new version of Happy Farm has been released!
-
-            ✅ Built with Flutter 3.22.1 (Dart 3.4.1)
-            📱 APK is attached below.
-
-            👉 Let us know your feedback!
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

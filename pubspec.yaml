@@ -31,6 +31,8 @@ dependencies:
   change_app_package_name: ^1.5.0
   intl: ^0.20.2
   html: ^0.15.6
+  share_plus: ^11.1.0
+  app_links: ^3.5.0
   
 dev_dependencies:
   flutter_test:

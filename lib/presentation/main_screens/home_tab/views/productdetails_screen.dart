@@ -11,17 +11,17 @@ import 'package:happy_farm/presentation/main_screens/wishlist/services/whislist_
 import 'package:happy_farm/utils/app_theme.dart';
 import 'package:happy_farm/widgets/custom_dialog.dart';
 import 'package:happy_farm/widgets/custom_snackbar.dart';
+import 'package:icons_plus/icons_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:html/parser.dart' show parse;
 import 'package:html/dom.dart' as dom;
-
+import 'package:share_plus/share_plus.dart';
 
 class ProductDetails extends StatefulWidget {
   final dynamic product;
 
-  const ProductDetails({super.key, required this.product});
-
+ const ProductDetails({super.key, required this.product});
   @override
   State<ProductDetails> createState() => _ProductDetailsState();
 }
@@ -53,6 +53,21 @@ class _ProductDetailsState extends State<ProductDetails> {
     _loadUser();
     _refreshProductDetails(); // Fetch fresh product data
     fetchReviews();
+  }
+
+  void _shareProduct(BuildContext context) async {
+    final productId = getProductId();
+    final productName = getProductName();
+
+    // Replace with your actual deep/universal link
+    final productUrl = 'https://sabbafarm.com/product/$productId';
+    final message = 'Check out this product: $productName\n$productUrl';
+
+    // Open native share sheet (like Amazon/Flipkart)
+    Share.share(
+      message,
+      subject: "Check out this product!",
+    );
   }
 
   void _showLimitDialog(BuildContext context, String title, String message) {
@@ -413,8 +428,6 @@ class _ProductDetailsState extends State<ProductDetails> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
               String? result;
-
-              // Determine what result to return based on what was modified
               if (_wishlistWasModified && _cartWasModified) {
                 result = 'both_updated';
               } else if (_wishlistWasModified) {
@@ -422,11 +435,17 @@ class _ProductDetailsState extends State<ProductDetails> {
               } else if (_cartWasModified) {
                 result = 'cart_updated';
               }
-
               Navigator.pop(context, result);
             }),
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.share),
+        //     onPressed: () =>
+        //         _shareProduct(context), // ✅ this calls when pressed
+        //     tooltip: 'Share',
+        //   ),
+        // ],
       ),
-      backgroundColor: Colors.white,
       body: isLoadingProductDetails
           ? const Center(
               child: CircularProgressIndicator(),
@@ -478,103 +497,127 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  Widget _buildProductImageGallery() {
-    return Stack(
-      children: [
-        SizedBox(
-          height: 400,
-          child: PageView.builder(
-            itemCount: getProductImages().length,
-            itemBuilder: (context, index) => CachedNetworkImage(
-              imageUrl: getProductImages()[index],
-              fit: BoxFit.cover,
-              width: double.infinity,
-              errorWidget: (context, url, error) => const Center(
-                child: Text(
-                  'Image could not be loaded',
-                  style: TextStyle(color: Colors.grey),
-                ),
+Widget _buildProductImageGallery() {
+  return Stack(
+    children: [
+      SizedBox(
+        height: 400,
+        child: PageView.builder(
+          itemCount: getProductImages().length,
+          itemBuilder: (context, index) => CachedNetworkImage(
+            imageUrl: getProductImages()[index],
+            fit: BoxFit.cover,
+            width: double.infinity,
+            errorWidget: (context, url, error) => const Center(
+              child: Text(
+                'Image could not be loaded',
+                style: TextStyle(color: Colors.grey),
               ),
-              progressIndicatorBuilder: (context, url, downloadProgress) =>
-                  Center(
-                child: CircularProgressIndicator(
-                  value: downloadProgress.progress,
-                ),
+            ),
+            progressIndicatorBuilder: (context, url, downloadProgress) =>
+                Center(
+              child: CircularProgressIndicator(
+                value: downloadProgress.progress,
               ),
             ),
           ),
         ),
-        Positioned(
-          top: 16,
-          right: 16,
-          child: GestureDetector(
-            onTap: () {
-              if (userId == null) {
-                showCustomDialog(
-                  context: context,
-                  title: 'Login Required',
-                  message: 'Please Login to continue',
-                  leftButtonText: 'Cancel',
-                  rightButtonText: 'Login',
-                  icon: Icons.warning,
-                  primaryColor: AppTheme.primaryColor,
-                  onLeftButtonPressed: () => Navigator.pop(context),
-                  onRightButtonPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => PhoneInputScreen()));
-                  },
-                );
-              } else if (!isLoadingWish) {
-                isWish ? removeWishlist() : addWishList();
-              }
-            },
-            child: Container(
+      ),
+
+      // Wishlist + Share icons at top right
+      Positioned(
+        top: 16,
+        right: 16,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Wishlist button
+            GestureDetector(
+              onTap: () {
+                if (userId == null) {
+                  showCustomDialog(
+                    context: context,
+                    title: 'Login Required',
+                    message: 'Please Login to continue',
+                    leftButtonText: 'Cancel',
+                    rightButtonText: 'Login',
+                    icon: Icons.warning,
+                    primaryColor: AppTheme.primaryColor,
+                    onLeftButtonPressed: () => Navigator.pop(context),
+                    onRightButtonPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => PhoneInputScreen()));
+                    },
+                  );
+                } else if (!isLoadingWish) {
+                  isWish ? removeWishlist() : addWishList();
+                }
+              },
+              child: Container(
+                height: 40,
+                width: 40,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white60,
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Center(
+                  child: isLoadingWish
+                      ? const SizedBox(
+                          key: ValueKey('loading'),
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                          ),
+                        )
+                      : AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (child, animation) {
+                            return ScaleTransition(
+                                scale: animation, child: child);
+                          },
+                          child: AnimatedScale(
+                            scale: isWish ? 1.2 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            child: Icon(
+                              isWish ? Icons.favorite : Icons.favorite_border,
+                              key: ValueKey(isWish),
+                              color: Colors.redAccent,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12), 
+            Container(
               height: 40,
               width: 40,
               decoration: BoxDecoration(
                 color: Colors.white60,
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: Center(
-                child: isLoadingWish
-                    ? const SizedBox(
-                        key: ValueKey('loading'),
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.redAccent),
-                        ),
-                      )
-                    : AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        transitionBuilder: (child, animation) {
-                          return ScaleTransition(
-                              scale: animation, child: child);
-                        },
-                        child: AnimatedScale(
-                          scale: isWish ? 1.2 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                          child: Icon(
-                            isWish ? Icons.favorite : Icons.favorite_border,
-                            key: ValueKey(isWish),
-                            color: Colors.redAccent,
-                            size: 26,
-                          ),
-                        ),
-                      ),
+              child: IconButton(
+                icon: const Icon(Bootstrap.share, color: Colors.black87),
+                tooltip: 'Share',
+                onPressed: () => _shareProduct(context),
               ),
             ),
-          ),
+          ],
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 
   Widget _buildVariantSelector() {
     final prices = getProductPrices();

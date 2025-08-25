@@ -28,6 +28,20 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>sabbafarm</string>
+    </array>
+  </dict>
+</array>
+
+<key>NSUserActivityTypes</key>
+<array>
+  <string>NSUserActivityTypeBrowsingWeb</string>
+</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

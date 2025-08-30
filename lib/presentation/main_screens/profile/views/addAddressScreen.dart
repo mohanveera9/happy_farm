@@ -94,7 +94,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
       final result = await addressService.createAddress(
         name: _nameController.text.trim(),
-        phoneNumber:_cleanPhoneNumber(_phoneController.text.trim()),
+        phoneNumber: _cleanPhoneNumber(_phoneController.text.trim()),
         email: _emailController.text.trim(), // <== added validator
         address:
             "${_address1Controller.text.trim()}, ${_address2Controller.text.trim()}",
@@ -109,13 +109,16 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       print('result:$result');
       if (result != null) {
         showSuccessSnackbar(context, "Address created successfully!");
+        FocusScope.of(context).unfocus();
         Navigator.pop(context);
       } else {
         showErrorSnackbar(context, "Failed to create address!");
+        FocusScope.of(context).unfocus();
         Navigator.pop(context);
       }
     } else {
       showErrorSnackbar(context, "Please fill all required fields");
+      FocusScope.of(context).unfocus();
       Navigator.pop(context);
     }
   }
@@ -232,238 +235,246 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Enter a new address"),
-        centerTitle: true,
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+    return PopScope(
+      canPop: true, // allow navigation
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return; // pop was cancelled
+        FocusScope.of(context).unfocus(); // dismiss keyboard
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Enter a new address"),
+          centerTitle: true,
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () =>
+                  {FocusScope.of(context).unfocus(), Navigator.pop(context)}),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle("Full name (First and Last name)"),
-                  _buildFormTextField(
-                    controller: _nameController,
-                    label: "Full Name *",
-                    validator: (val) =>
-                        val == null || val.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildSectionTitle("Phone number"),
-                  _buildFormTextField(
-                    controller: _phoneController,
-                    label: "Phone Number *",
-                    keyboardType: TextInputType.phone,
-                    validator: (val) =>
-                        val == null || val.isEmpty ? 'Required' : null,
-                  ),
-                  _buildSectionTitle("Email Address"),
-                  _buildFormTextField(
-                    controller: _emailController,
-                    label: "Email *",
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'Required';
-                      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                      return emailRegex.hasMatch(val)
-                          ? null
-                          : 'Enter a valid email';
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6, bottom: 16),
-                    child: Text(
-                      "May be used to assist delivery",
-                      style: TextStyle(color: Colors.grey),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle("Full name (First and Last name)"),
+                    _buildFormTextField(
+                      controller: _nameController,
+                      label: "Full Name *",
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
                     ),
-                  ),
-                  // Use My Location Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLocating ? null : _getCurrentLocation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade200,
-                        foregroundColor: Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
-                        side: BorderSide(color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+
+                    _buildSectionTitle("Phone number"),
+                    _buildFormTextField(
+                      controller: _phoneController,
+                      label: "Phone Number *",
+                      keyboardType: TextInputType.phone,
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
+                    ),
+                    _buildSectionTitle("Email Address"),
+                    _buildFormTextField(
+                      controller: _emailController,
+                      label: "Email *",
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty)
+                          return 'Required';
+                        final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                        return emailRegex.hasMatch(val)
+                            ? null
+                            : 'Enter a valid email';
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6, bottom: 16),
+                      child: Text(
+                        "May be used to assist delivery",
+                        style: TextStyle(color: Colors.grey),
                       ),
-                      child: _isLocating
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.black54),
+                    ),
+                    // Use My Location Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLocating ? null : _getCurrentLocation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade200,
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          side: BorderSide(color: Colors.grey.shade400),
+                        ),
+                        child: _isLocating
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.black54),
+                                ),
+                              )
+                            : const Text(
+                                "Use my location",
+                                style: TextStyle(fontSize: 16),
                               ),
-                            )
-                          : const Text(
-                              "Use my location",
-                              style: TextStyle(fontSize: 16),
-                            ),
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  _buildSectionTitle("Address"),
-                  _buildFormTextField(
-                    controller: _address1Controller,
-                    label: "Street address or P.O. Box *",
-                    validator: (val) =>
-                        val == null || val.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFormTextField(
-                    controller: _address2Controller,
-                    label: "Apt, Suite, Unit, Building (optional)",
-                  ),
-                  const SizedBox(height: 20),
+                    _buildSectionTitle("Address"),
+                    _buildFormTextField(
+                      controller: _address1Controller,
+                      label: "Street address or P.O. Box *",
+                      validator: (val) =>
+                          val == null || val.isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFormTextField(
+                      controller: _address2Controller,
+                      label: "Apt, Suite, Unit, Building (optional)",
+                    ),
+                    const SizedBox(height: 20),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle("City"),
-                            _buildFormTextField(
-                              controller: _cityController,
-                              label: "City *",
-                              validator: (val) => val == null || val.isEmpty
-                                  ? 'Required'
-                                  : null,
-                            ),
-                          ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle("City"),
+                              _buildFormTextField(
+                                controller: _cityController,
+                                label: "City *",
+                                validator: (val) => val == null || val.isEmpty
+                                    ? 'Required'
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle("State"),
-                            _buildFormTextField(
-                              controller: _stateController,
-                              label: "State *",
-                              validator: (val) => val == null || val.isEmpty
-                                  ? 'Required'
-                                  : null,
-                            ),
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle("State"),
+                              _buildFormTextField(
+                                controller: _stateController,
+                                label: "State *",
+                                validator: (val) => val == null || val.isEmpty
+                                    ? 'Required'
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle("Pincode / ZIP"),
-                            _buildFormTextField(
-                              controller: _pincodeController,
-                              label: "Pincode *",
-                              keyboardType: TextInputType.number,
-                              validator: (val) => val == null || val.isEmpty
-                                  ? 'Required'
-                                  : null,
-                            ),
-                          ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle("Pincode / ZIP"),
+                              _buildFormTextField(
+                                controller: _pincodeController,
+                                label: "Pincode *",
+                                keyboardType: TextInputType.number,
+                                validator: (val) => val == null || val.isEmpty
+                                    ? 'Required'
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle("Landmark"),
-                            _buildFormTextField(
-                              controller: _landmarkController,
-                              label: "Landmark",
-                            ),
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle("Landmark"),
+                              _buildFormTextField(
+                                controller: _landmarkController,
+                                label: "Landmark",
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
 
-                  _buildSectionTitle("Address Type"),
-                  _buildAddressTypeDropdown(),
-                  const SizedBox(height: 20),
+                    _buildSectionTitle("Address Type"),
+                    _buildAddressTypeDropdown(),
+                    const SizedBox(height: 20),
 
-                  _buildSectionTitle("Set as default address"),
-                  _buildIsDefaultSwitch(),
-                  const SizedBox(height: 28),
+                    _buildSectionTitle("Set as default address"),
+                    _buildIsDefaultSwitch(),
+                    const SizedBox(height: 28),
 
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _issavingaddress
-                          ? null // disable button while loading
-                          : widget.existingAddress == null
-                              ? _saveAddress
-                              : _updateAddress,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _issavingaddress
+                            ? null // disable button while loading
+                            : widget.existingAddress == null
+                                ? _saveAddress
+                                : _updateAddress,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      child: _issavingaddress
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
+                        child: _issavingaddress
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
                                   ),
-                                ),
-                                SizedBox(width: 12),
-                                Text(
-                                  "Loading...",
-                                  style: TextStyle(
-                                      fontSize: 16, color: Colors.white),
-                                ),
-                              ],
-                            )
-                          : Text(
-                              widget.existingAddress == null
-                                  ? 'SAVE ADDRESS'
-                                  : 'UPDATE ADDRESS',
-                              style: const TextStyle(
-                                  fontSize: 16, color: Colors.white),
-                            ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    "Loading...",
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.white),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                widget.existingAddress == null
+                                    ? 'SAVE ADDRESS'
+                                    : 'UPDATE ADDRESS',
+                                style: const TextStyle(
+                                    fontSize: 16, color: Colors.white),
+                              ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

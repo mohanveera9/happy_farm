@@ -65,68 +65,76 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final primaryColor = AppTheme.primaryColor;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Personal Info'),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+   return PopScope(
+    canPop: true, // allow navigation
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) return; // pop was cancelled
+      FocusScope.of(context).unfocus(); // dismiss keyboard
+    },
+    child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Personal Info'),
+          centerTitle: true,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => {
+                    FocusScope.of(context).unfocus(),
+                    Navigator.pop(context),
+                  }),
         ),
-      ),
-      body: _isFetching
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  children: [
-                    _buildTextField(
-                      controller: _nameController,
-                      icon: Icons.person,
-                      label: 'Full Name',
-                      validator: (v) => v!.isEmpty ? 'Enter name' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _emailController,
-                      icon: Icons.email,
-                      label: 'Email Address',
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) =>
-                          v!.contains('@') ? null : 'Enter valid email',
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton.icon(
-                      onPressed: _isSaving ? null : updatePersonalInfo,
-                      icon: _isSaving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.save),
-                      label: const Text('Save Changes'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+        body: _isFetching
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    children: [
+                      _buildTextField(
+                        controller: _nameController,
+                        icon: Icons.person,
+                        label: 'Full Name',
+                        validator: (v) => v!.isEmpty ? 'Enter name' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _emailController,
+                        icon: Icons.email,
+                        label: 'Email Address',
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) =>
+                            v!.contains('@') ? null : 'Enter valid email',
+                      ),
+                      const SizedBox(height: 30),
+                      ElevatedButton.icon(
+                        onPressed: _isSaving ? null : updatePersonalInfo,
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.save),
+                        label: const Text('Save Changes'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 

@@ -30,7 +30,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     6,
     (index) => FocusNode(),
   );
-  
+
   bool _isLoading = false;
   bool _isResending = false;
   Timer? _resendTimer;
@@ -64,11 +64,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     final prefs = await SharedPreferences.getInstance();
     final key = 'otp_resend_${widget.phoneNumber}';
     final lastResendTime = prefs.getInt(key);
-    
+
     if (lastResendTime != null) {
       final currentTime = DateTime.now().millisecondsSinceEpoch;
       final timeDifference = (currentTime - lastResendTime) ~/ 1000;
-      
+
       if (timeDifference < _resendTimeLimit) {
         setState(() {
           _resendCountdown = _resendTimeLimit - timeDifference;
@@ -110,7 +110,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
-Future<void> _verifyOtp() async {
+  Future<void> _verifyOtp() async {
     if (_otpCode.length != 6) {
       CustomSnackbar.showError(context, "Error", "Please enter complete OTP");
       return;
@@ -132,11 +132,13 @@ Future<void> _verifyOtp() async {
     if (result != null && result['error'] == null) {
       // Clear the resend timer on successful verification
       await _clearResendTimer();
-      
+
       final user = result['user'];
-      
+
       // Check if user needs onboarding
-      if (user['name'] == null || user['name'].isEmpty || user['onboardingComplete'] != true) {
+      if (user['name'] == null ||
+          user['name'].isEmpty ||
+          user['onboardingComplete'] != true) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OnboardScreen()),
@@ -166,11 +168,8 @@ Future<void> _verifyOtp() async {
 
   Future<void> _resendOtp() async {
     if (_resendCountdown > 0) {
-      CustomSnackbar.showError(
-        context, 
-        "Please wait", 
-        "You can resend OTP after ${_formatCountdown(_resendCountdown)}"
-      );
+      CustomSnackbar.showError(context, "Please wait",
+          "You can resend OTP after ${_formatCountdown(_resendCountdown)}");
       return;
     }
 
@@ -191,7 +190,7 @@ Future<void> _verifyOtp() async {
       final prefs = await SharedPreferences.getInstance();
       final key = 'otp_resend_${widget.phoneNumber}';
       await prefs.setInt(key, DateTime.now().millisecondsSinceEpoch);
-      
+
       setState(() {
         _resendCountdown = _resendTimeLimit;
       });
@@ -248,87 +247,98 @@ Future<void> _verifyOtp() async {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFEAFBF3), Color(0xFFFFFFFF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+    return PopScope(
+      canPop: true, // allow navigation
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return; // pop was cancelled
+        FocusScope.of(context).unfocus(); // dismiss keyboard
+      },
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFEAFBF3), Color(0xFFFFFFFF)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48),
-            child: Column(
-              children: [
-                Image.asset('assets/images/sb.png', height: 80),
-                const SizedBox(height: 24),
-                const Text('Verify Phone Number',
-                    style:
-                        TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                Text('Enter the 6-digit code sent to ${widget.phoneNumber}',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                const SizedBox(height: 40),
+          child: Center(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48),
+              child: Column(
+                children: [
+                  Image.asset('assets/images/sb.png', height: 80),
+                  const SizedBox(height: 24),
+                  const Text('Verify Phone Number',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Text('Enter the 6-digit code sent to ${widget.phoneNumber}',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                  const SizedBox(height: 40),
 
-                // OTP Input Fields
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(6, (index) => _buildOtpField(index)),
-                ),
-                const SizedBox(height: 30),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _verifyOtp,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const Text(
-                            'Verifying...',
-                            style: TextStyle(
-                                fontSize: 17, fontWeight: FontWeight.bold),
-                          )
-                        : const Text(
-                            'Verify OTP',
-                            style: TextStyle(
-                                fontSize: 17, fontWeight: FontWeight.bold),
-                          ),
+                  // OTP Input Fields
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children:
+                        List.generate(6, (index) => _buildOtpField(index)),
                   ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 30),
 
-                // Resend OTP
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("Didn't receive the code? "),
-                    GestureDetector(
-                      onTap: (_isResending || _resendCountdown > 0) ? null : _resendOtp,
-                      child: Text(
-                        _isResending 
-                            ? 'Resending...' 
-                            : _resendCountdown > 0 
-                                ? 'Resend in ${_formatCountdown(_resendCountdown)}'
-                                : 'Resend OTP',
-                        style: TextStyle(
-                          color: (_isResending || _resendCountdown > 0) 
-                              ? Colors.grey 
-                              : AppTheme.primaryColor,
-                          fontWeight: FontWeight.bold,
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _verifyOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
+                      child: _isLoading
+                          ? const Text(
+                              'Verifying...',
+                              style: TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.bold),
+                            )
+                          : const Text(
+                              'Verify OTP',
+                              style: TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Resend OTP
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Didn't receive the code? "),
+                      GestureDetector(
+                        onTap: (_isResending || _resendCountdown > 0)
+                            ? null
+                            : _resendOtp,
+                        child: Text(
+                          _isResending
+                              ? 'Resending...'
+                              : _resendCountdown > 0
+                                  ? 'Resend in ${_formatCountdown(_resendCountdown)}'
+                                  : 'Resend OTP',
+                          style: TextStyle(
+                            color: (_isResending || _resendCountdown > 0)
+                                ? Colors.grey
+                                : AppTheme.primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

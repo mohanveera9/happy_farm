@@ -16,14 +16,21 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+
 class CheckoutScreen extends StatefulWidget {
   final List<CartItem> cartItems;
   final int totalAmount;
+  final bool isCashOnDelivery;
+  final double onlinePay;
+  final double codPay;
 
   const CheckoutScreen({
     Key? key,
     required this.cartItems,
     required this.totalAmount,
+    this.isCashOnDelivery = false,
+    this.onlinePay = 0,
+    this.codPay = 0,
   }) : super(key: key);
 
   @override
@@ -207,6 +214,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       email: _selectedAddress['email'],
       address: _selectedAddress['address'],
       pincode: _selectedAddress['pincode'],
+      paymentMode: widget.isCashOnDelivery ? 'hybrid_cod' : 'full_payment',
     );
 
     if (orderResponse != null) {
@@ -674,6 +682,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildOrderSummary() {
     final cartItems = widget.cartItems;
     final totalAmount = widget.totalAmount;
+    final isCOD = widget.isCashOnDelivery;
+    final onlinePay = widget.onlinePay;
+    final codPay = widget.codPay;
 
     return Card(
       elevation: 3,
@@ -695,26 +706,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(child: Text(item.product.name)),
-                    Text(
-                        '₹${item.product.prices[0].actualPrice} x ${item.quantity}'),
+                    Text('₹${item.product.prices[0].actualPrice} x ${item.quantity}'),
                   ],
                 ),
               );
             }).toList(),
             const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Total",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '₹$totalAmount',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
+            if (isCOD) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Pay Now (5%)", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('₹${onlinePay.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Cash on Delivery", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text('₹${codPay.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Total", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('₹$totalAmount', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ] else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Total", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('₹$totalAmount', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
                 width: double.infinity,
@@ -731,9 +761,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           'Loading ...',
                           style: TextStyle(fontSize: 16, color: Colors.white),
                         )
-                      : const Text(
-                          'Place Order',
-                          style: TextStyle(fontSize: 16, color: Colors.white),
+                      : Text(
+                          isCOD ? 'Pay 5% Now' : 'Place Order',
+                          style: const TextStyle(fontSize: 16, color: Colors.white),
                         ),
                 )),
           ],

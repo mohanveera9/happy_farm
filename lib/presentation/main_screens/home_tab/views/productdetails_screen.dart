@@ -21,7 +21,7 @@ import 'package:share_plus/share_plus.dart';
 class ProductDetails extends StatefulWidget {
   final dynamic product;
 
- const ProductDetails({super.key, required this.product});
+  const ProductDetails({super.key, required this.product});
   @override
   State<ProductDetails> createState() => _ProductDetailsState();
 }
@@ -417,207 +417,220 @@ class _ProductDetailsState extends State<ProductDetails> {
     final prices = getProductPrices();
     final price = prices[selectedPriceIndex];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Product Details"),
-        centerTitle: true,
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              String? result;
-              if (_wishlistWasModified && _cartWasModified) {
-                result = 'both_updated';
-              } else if (_wishlistWasModified) {
-                result = 'wishlist_updated';
-              } else if (_cartWasModified) {
-                result = 'cart_updated';
-              }
-              Navigator.pop(context, result);
-            }),
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.share),
-        //     onPressed: () =>
-        //         _shareProduct(context), // ✅ this calls when pressed
-        //     tooltip: 'Share',
-        //   ),
-        // ],
-      ),
-      body: isLoadingProductDetails
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildProductImageGallery(),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          getProductName(),
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: true, // allow navigation
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return; // pop was cancelled
+        FocusScope.of(context).unfocus(); // dismiss keyboard
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Product Details"),
+          centerTitle: true,
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                String? result;
+                if (_wishlistWasModified && _cartWasModified) {
+                  result = 'both_updated';
+                } else if (_wishlistWasModified) {
+                  result = 'wishlist_updated';
+                } else if (_cartWasModified) {
+                  result = 'cart_updated';
+                }
+                FocusScope.of(context).unfocus();
+                Navigator.pop(context, result);
+              }),
+          // actions: [
+          //   IconButton(
+          //     icon: const Icon(Icons.share),
+          //     onPressed: () =>
+          //         _shareProduct(context), // ✅ this calls when pressed
+          //     tooltip: 'Share',
+          //   ),
+          // ],
+        ),
+        body: isLoadingProductDetails
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildProductImageGallery(),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            getProductName(),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        _buildVariantSelector(),
-                        const SizedBox(height: 10),
-                        _buildPriceInfo(price),
-                        const SizedBox(height: 8),
-                        Text('${price.quantity} ${price.type}',
-                            style: const TextStyle(fontSize: 16)),
-                        const SizedBox(height: 8),
-                        Text(
-                          price.countInStock > 0 ? 'IN STOCK' : 'OUT OF STOCK',
-                          style: TextStyle(
-                              color: price.countInStock > 0
-                                  ? AppTheme.primaryColor
-                                  : Colors.red,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildQuantityAndCartSection(price),
-                        const SizedBox(height: 24),
-                        _buildInfoCards(),
-                        const SizedBox(height: 20),
-                        _buildReviewsSection(),
-                      ],
+                          const SizedBox(height: 10),
+                          _buildVariantSelector(),
+                          const SizedBox(height: 10),
+                          _buildPriceInfo(price),
+                          const SizedBox(height: 8),
+                          Text('${price.quantity} ${price.type}',
+                              style: const TextStyle(fontSize: 16)),
+                          const SizedBox(height: 8),
+                          Text(
+                            price.countInStock > 0
+                                ? 'IN STOCK'
+                                : 'OUT OF STOCK',
+                            style: TextStyle(
+                                color: price.countInStock > 0
+                                    ? AppTheme.primaryColor
+                                    : Colors.red,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildQuantityAndCartSection(price),
+                          const SizedBox(height: 24),
+                          _buildInfoCards(),
+                          const SizedBox(height: 20),
+                          _buildReviewsSection(),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
-Widget _buildProductImageGallery() {
-  return Stack(
-    children: [
-      SizedBox(
-        height: 400,
-        child: PageView.builder(
-          itemCount: getProductImages().length,
-          itemBuilder: (context, index) => CachedNetworkImage(
-            imageUrl: getProductImages()[index],
-            fit: BoxFit.cover,
-            width: double.infinity,
-            errorWidget: (context, url, error) => const Center(
-              child: Text(
-                'Image could not be loaded',
-                style: TextStyle(color: Colors.grey),
+  Widget _buildProductImageGallery() {
+    return Stack(
+      children: [
+        SizedBox(
+          height: 400,
+          child: PageView.builder(
+            itemCount: getProductImages().length,
+            itemBuilder: (context, index) => CachedNetworkImage(
+              imageUrl: getProductImages()[index],
+              fit: BoxFit.cover,
+              width: double.infinity,
+              errorWidget: (context, url, error) => const Center(
+                child: Text(
+                  'Image could not be loaded',
+                  style: TextStyle(color: Colors.grey),
+                ),
               ),
-            ),
-            progressIndicatorBuilder: (context, url, downloadProgress) =>
-                Center(
-              child: CircularProgressIndicator(
-                value: downloadProgress.progress,
+              progressIndicatorBuilder: (context, url, downloadProgress) =>
+                  Center(
+                child: CircularProgressIndicator(
+                  value: downloadProgress.progress,
+                ),
               ),
             ),
           ),
         ),
-      ),
 
-      // Wishlist + Share icons at top right
-      Positioned(
-        top: 16,
-        right: 16,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Wishlist button
-            GestureDetector(
-              onTap: () {
-                if (userId == null) {
-                  showCustomDialog(
-                    context: context,
-                    title: 'Login Required',
-                    message: 'Please Login to continue',
-                    leftButtonText: 'Cancel',
-                    rightButtonText: 'Login',
-                    icon: Icons.warning,
-                    primaryColor: AppTheme.primaryColor,
-                    onLeftButtonPressed: () => Navigator.pop(context),
-                    onRightButtonPressed: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => PhoneInputScreen()));
-                    },
-                  );
-                } else if (!isLoadingWish) {
-                  isWish ? removeWishlist() : addWishList();
-                }
-              },
-              child: Container(
+        // Wishlist + Share icons at top right
+        Positioned(
+          top: 16,
+          right: 16,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Wishlist button
+              GestureDetector(
+                onTap: () {
+                  if (userId == null) {
+                    showCustomDialog(
+                      context: context,
+                      title: 'Login Required',
+                      message: 'Please Login to continue',
+                      leftButtonText: 'Cancel',
+                      rightButtonText: 'Login',
+                      icon: Icons.warning,
+                      primaryColor: AppTheme.primaryColor,
+                      onLeftButtonPressed: () {
+                        FocusScope.of(context).unfocus();
+                        Navigator.pop(context);
+                      },
+                      onRightButtonPressed: () {
+                        FocusScope.of(context).unfocus();
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => PhoneInputScreen()));
+                      },
+                    );
+                  } else if (!isLoadingWish) {
+                    isWish ? removeWishlist() : addWishList();
+                  }
+                },
+                child: Container(
+                  height: 40,
+                  width: 40,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white60,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: Center(
+                    child: isLoadingWish
+                        ? const SizedBox(
+                            key: ValueKey('loading'),
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.redAccent),
+                            ),
+                          )
+                        : AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) {
+                              return ScaleTransition(
+                                  scale: animation, child: child);
+                            },
+                            child: AnimatedScale(
+                              scale: isWish ? 1.2 : 1.0,
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOut,
+                              child: Icon(
+                                isWish ? Icons.favorite : Icons.favorite_border,
+                                key: ValueKey(isWish),
+                                color: Colors.redAccent,
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
                 height: 40,
                 width: 40,
-                margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
                   color: Colors.white60,
                   borderRadius: BorderRadius.circular(50),
                 ),
-                child: Center(
-                  child: isLoadingWish
-                      ? const SizedBox(
-                          key: ValueKey('loading'),
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.redAccent),
-                          ),
-                        )
-                      : AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          transitionBuilder: (child, animation) {
-                            return ScaleTransition(
-                                scale: animation, child: child);
-                          },
-                          child: AnimatedScale(
-                            scale: isWish ? 1.2 : 1.0,
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOut,
-                            child: Icon(
-                              isWish ? Icons.favorite : Icons.favorite_border,
-                              key: ValueKey(isWish),
-                              color: Colors.redAccent,
-                              size: 26,
-                            ),
-                          ),
-                        ),
+                child: IconButton(
+                  icon: const Icon(Bootstrap.share, color: Colors.black87),
+                  tooltip: 'Share',
+                  onPressed: () => _shareProduct(context),
                 ),
               ),
-            ),
-            SizedBox(height: 12), 
-            Container(
-              height: 40,
-              width: 40,
-              decoration: BoxDecoration(
-                color: Colors.white60,
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: IconButton(
-                icon: const Icon(Bootstrap.share, color: Colors.black87),
-                tooltip: 'Share',
-                onPressed: () => _shareProduct(context),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    ],
-  );
-}
-
+      ],
+    );
+  }
 
   Widget _buildVariantSelector() {
     final prices = getProductPrices();
@@ -1290,7 +1303,7 @@ Widget _buildProductImageGallery() {
                               setModalState(() {
                                 isSubmittingReview = false;
                               });
-
+                              FocusScope.of(context).unfocus();
                               Navigator.pop(context);
                             },
                       style: ElevatedButton.styleFrom(

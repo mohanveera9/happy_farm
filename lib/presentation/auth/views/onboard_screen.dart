@@ -29,7 +29,9 @@ class _OnboardScreenState extends State<OnboardScreen> {
 
     final result = await _authService.onboard(
       name: _nameController.text.trim(),
-      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+      email: _emailController.text.trim().isEmpty
+          ? null
+          : _emailController.text.trim(),
     );
 
     setState(() {
@@ -39,10 +41,10 @@ class _OnboardScreenState extends State<OnboardScreen> {
     if (result != null && result['error'] == null) {
       // Get updated user details
       final userDetailsResult = await _authService.getMe();
-      
+
       if (userDetailsResult != null && userDetailsResult['error'] == null) {
         final user = userDetailsResult;
-        
+
         Provider.of<UserProvider>(context, listen: false).setUser(
           username: user['name'],
           email: user['email'],
@@ -51,8 +53,7 @@ class _OnboardScreenState extends State<OnboardScreen> {
         );
       }
 
-      CustomSnackbar.showSuccess(
-          context, "Success", "Welcome to Sabba Farm!");
+      CustomSnackbar.showSuccess(context, "Success", "Welcome to Sabba Farm!");
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -79,93 +80,103 @@ class _OnboardScreenState extends State<OnboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFEAFBF3), Color(0xFFFFFFFF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+    return PopScope(
+      canPop: true, // allow navigation
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return; // pop was cancelled
+        FocusScope.of(context).unfocus(); // dismiss keyboard
+      },
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFEAFBF3), Color(0xFFFFFFFF)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  Image.asset('assets/images/sb.png', height: 80),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Complete Your Profile',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Tell us a bit about yourself',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Name Field
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: _inputDecoration('Full Name', Icons.person),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty)
-                        return 'Full name is required';
-                      if (value.trim().length < 2)
-                        return 'Full name must be at least 2 characters';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Email Field (Optional)
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: _inputDecoration('Email (Optional)', Icons.email),
-                    validator: (value) {
-                      if (value != null && value.trim().isNotEmpty) {
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(value.trim())) {
-                          return 'Enter a valid email address';
-                        }
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 40),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      onPressed: _isLoading ? null : _completeOnboarding,
-                      child: _isLoading
-                          ? const Text(
-                              'Completing...',
-                              style: TextStyle(
-                                  fontSize: 17, fontWeight: FontWeight.w600),
-                            )
-                          : const Text(
-                              'Complete Profile',
-                              style: TextStyle(
-                                  fontSize: 17, fontWeight: FontWeight.w600),
-                            ),
+          child: Center(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Image.asset('assets/images/sb.png', height: 80),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Complete Your Profile',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Tell us a bit about yourself',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // Name Field
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: _inputDecoration('Full Name', Icons.person),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty)
+                          return 'Full name is required';
+                        if (value.trim().length < 2)
+                          return 'Full name must be at least 2 characters';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Email Field (Optional)
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration:
+                          _inputDecoration('Email (Optional)', Icons.email),
+                      validator: (value) {
+                        if (value != null && value.trim().isNotEmpty) {
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                              .hasMatch(value.trim())) {
+                            return 'Enter a valid email address';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 40),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: _isLoading ? null : _completeOnboarding,
+                        child: _isLoading
+                            ? const Text(
+                                'Completing...',
+                                style: TextStyle(
+                                    fontSize: 17, fontWeight: FontWeight.w600),
+                              )
+                            : const Text(
+                                'Complete Profile',
+                                style: TextStyle(
+                                    fontSize: 17, fontWeight: FontWeight.w600),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

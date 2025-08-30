@@ -9,6 +9,7 @@ class OrderService {
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
+    print('Auth Token: $token');
     return {
       'Content-Type': 'application/json',
       'Authorization': '$token',
@@ -21,6 +22,7 @@ class OrderService {
     required String email,
     required String address,
     required String pincode,
+    required String paymentMode,
   }) async {
     final headers = await _getAuthHeaders();
     final body = jsonEncode({
@@ -30,7 +32,8 @@ class OrderService {
         'address': address,
         'pincode': pincode,
         'email': email,
-      }
+      },
+      'paymentMode':paymentMode,
     });
 
     final response = await http.post(
@@ -240,19 +243,15 @@ class OrderService {
   }) async {
     try {
       final headers = await _getAuthHeaders();
-
       final queryParams = {
         'page': page.toString(),
         'limit': limit.toString(),
         if (status != null) 'status': status,
         if (orderId != null) 'orderId': orderId,
       };
-
       final uri = Uri.parse('$baseUrl/orders/refunds')
           .replace(queryParameters: queryParams);
-
       final response = await http.get(uri, headers: headers);
-
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {

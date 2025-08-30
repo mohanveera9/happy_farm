@@ -15,8 +15,12 @@ class RefundDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = refundData['order'];
-    final products = order['products'] as List<dynamic>;
+  final order = refundData['order'] ?? refundData['orderId'];
+  final products = (order != null && order['products'] != null)
+    ? order['products'] as List<dynamic>
+    : <dynamic>[];
+  final orderAmount = order != null && order['amount'] != null ? order['amount'].toString() : '-';
+  final orderDate = order != null && order['date'] != null ? formatDate(order['date']) : '-';
 
     return Scaffold(
       appBar: AppBar(
@@ -48,10 +52,10 @@ class RefundDetailsScreen extends StatelessWidget {
               title: 'Order Details',
               icon: Icons.shopping_cart_checkout,
               children: [
-                _buildDetailRow('Order Amount', '₹${order['amount']}'),
-                _buildDetailRow('Order Date', formatDate(order['date'])),
+                _buildDetailRow('Order Amount', '₹$orderAmount'),
+                _buildDetailRow('Order Date', orderDate),
                 _buildDetailRow(
-                    'Cancelled Date', formatDate(refundData['refundDate'])),
+                    'Cancelled Date', refundData['refundDate'] != null ? formatDate(refundData['refundDate']) : '-'),
               ],
             ),
             const SizedBox(height: 16),

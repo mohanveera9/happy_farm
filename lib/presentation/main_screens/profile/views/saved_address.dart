@@ -73,7 +73,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => {FocusScope.of(context).unfocus(),
+            Navigator.pop(context),}
         ),
       ),
       body: RefreshIndicator(

@@ -651,53 +651,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        title: const Center(child: Text("My Profile")),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-      ),
-      body: FutureBuilder<void>(
-        future: _initFuture,
-        builder: (context, snapshot) {
-          if (_isCheckingLogin) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          if (!_isLoggedIn) {
-            return WithoutLoginScreen(
-              icon: Icons.person_outline,
-              title: 'My Profile',
-              subText: 'Login to view and manage your profile settings',
-            );
-          }
-
-          return Consumer<UserProvider>(
-            builder: (context, userProvider, child) {
-              final user = userProvider.user;
-
-              return SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildProfileHeader(
-                      user.username ?? "Unknown",
-                      user.phoneNumber ?? "Unknown",
-                      user.image ?? "",
-                    
-                    ),
-                    const SizedBox(height: 40),
-                    _buildOptions(context),
-                  ],
-                ),
+    return PopScope(
+      canPop: true, // allow navigation
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return; // pop was cancelled
+        FocusScope.of(context).unfocus(); // dismiss keyboard
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(
+          title: const Center(child: Text("My Profile")),
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+        ),
+        body: FutureBuilder<void>(
+          future: _initFuture,
+          builder: (context, snapshot) {
+            if (_isCheckingLogin) {
+              return const Center(
+                child: CircularProgressIndicator(),
               );
-            },
-          );
-        },
+            }
+
+            if (!_isLoggedIn) {
+              return WithoutLoginScreen(
+                icon: Icons.person_outline,
+                title: 'My Profile',
+                subText: 'Login to view and manage your profile settings',
+              );
+            }
+
+            return Consumer<UserProvider>(
+              builder: (context, userProvider, child) {
+                final user = userProvider.user;
+
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildProfileHeader(
+                        user.username ?? "Unknown",
+                        user.phoneNumber ?? "Unknown",
+                        user.image ?? "",
+                      ),
+                      const SizedBox(height: 40),
+                      _buildOptions(context),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -863,6 +869,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               },
               onNo: () {
+                FocusScope.of(context).unfocus();
                 Navigator.pop(context);
               },
               msg1: 'Cancel',

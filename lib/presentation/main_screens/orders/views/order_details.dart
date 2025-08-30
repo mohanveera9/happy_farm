@@ -30,21 +30,27 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
   void _checkRefundStatus(BuildContext context, String orderId) async {
-    final refundResponse =
-        await OrderService().getRefundDetails(orderId: orderId);
+    final refundResponse = await OrderService().getRefundDetails(orderId: orderId);
 
     if (refundResponse != null && refundResponse['success'] == true) {
-      final refunds = refundResponse['data']['refunds'] as List<dynamic>;
-
+      // Support both top-level and nested refunds array
+      List<dynamic>? refunds;
+      if (refundResponse['refunds'] != null) {
+        refunds = refundResponse['refunds'] as List<dynamic>;
+      } else if (refundResponse['data'] != null && refundResponse['data']['refunds'] != null) {
+        refunds = refundResponse['data']['refunds'] as List<dynamic>;
+      }
+      if (refunds == null || refunds.isEmpty) {
+        setState(() { _isCheckingRefund = false; });
+        showErrorSnackbar(context, "No Refund Details Available");
+        return;
+      }
       final refund = refunds.firstWhere(
-        (r) => r['orderId']['_id'] == orderId,
+        (r) => r['orderId'] != null && r['orderId']['_id'] == orderId,
         orElse: () => null,
       );
-
       if (refund != null) {
-        setState(() {
-          _isCheckingRefund = false;
-        });
+        setState(() { _isCheckingRefund = false; });
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -52,11 +58,25 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
         );
       } else {
-        setState(() {
-          _isCheckingRefund = true;
-        });
+        setState(() { _isCheckingRefund = false; });
         showErrorSnackbar(context, "No Refund Details Available");
       }
+    } else {
+      setState(() { _isCheckingRefund = false; });
+      showErrorSnackbar(context, "Failed to fetch refund details");
+    }
+  }
+
+  String getPaymentModeLabel(String? mode) {
+    switch (mode) {
+      case 'hybrid_cod':
+        return 'Cash on Delivery (Partial Online Payment)';
+      case 'full_payment':
+        return 'Full Online Payment';
+      case 'cod':
+        return 'Cash on Delivery';
+      default:
+        return mode ?? '-';
     }
   }
 
@@ -297,7 +317,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     try {
       final data = await OrderService().fetchOrderById(widget.orderId);
       setState(() {
-        print('mmm${widget.orderId}');
         orderData = data;
         print("mvvv$orderData");
         isLoading = false;
@@ -392,7 +411,55 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           ),
                         ),
                       ),
-
+                      SizedBox(height: 16),
+                      // 🚀 Payment Details Card
+                      Card(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        elevation: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.payments, color: primaryColor),
+                                  SizedBox(width: 8),
+                                  Text("Payment Details",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              Divider(),
+                              buildInfoRow(
+                                "Payment Mode",
+                                getPaymentModeLabel(
+                                    orderData!['paymentMode']?.toString()),
+                                fontWeight: FontWeight.bold,
+                              ),
+                              if (orderData!['paymentMode'] ==
+                                  'hybrid_cod') ...[
+                                buildInfoRow("Paid Online",
+                                    "₹${orderData!['onlineAmount'] ?? 0}"),
+                                buildInfoRow("To Pay at Delivery",
+                                    "₹${orderData!['codAmount'] ?? 0}",
+                                    valueColor: Colors.green,
+                                    fontWeight: FontWeight.bold),
+                              ] else ...[
+                                buildInfoRow("Paid Online",
+                                    "₹${orderData!['amount'] ?? 0}",
+                                    valueColor: Colors.blue,
+                                    fontWeight: FontWeight.bold),
+                              ],
+                              buildInfoRow("Total Amount",
+                                  "₹${orderData!['amount'] ?? 0}",
+                                  fontWeight: FontWeight.bold),
+                            ],
+                          ),
+                        ),
+                      ),
                       SizedBox(height: 16),
 
                       // 🚀 Customer Info Card

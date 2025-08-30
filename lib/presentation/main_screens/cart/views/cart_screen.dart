@@ -20,6 +20,7 @@ class CartScreen extends StatefulWidget {
   State<CartScreen> createState() => _CartScreenState();
 }
 
+
 class _CartScreenState extends State<CartScreen> {
   late List<CartItem> _cartItems = [];
   bool _isLoading = true;
@@ -30,6 +31,9 @@ class _CartScreenState extends State<CartScreen> {
   Set<String> _updatingAdd = {};
   Set<String> _updatingRemove = {};
   bool _cartWasModified = false;
+
+  // COD selector state
+  bool _isCashOnDelivery = false;
 
   // Pagination variables
   int _currentPage = 1;
@@ -208,6 +212,7 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
+        FocusScope.of(context).unfocus();
         Navigator.pop(context, _cartWasModified ? 'cart_updated' : null);
         return false;
       },
@@ -223,6 +228,7 @@ class _CartScreenState extends State<CartScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
+              FocusScope.of(context).unfocus();
               Navigator.pop(context, _cartWasModified ? 'cart_updated' : null);
             },
           ),
@@ -373,9 +379,54 @@ class _CartScreenState extends State<CartScreen> {
     return Column(
       children: [
         const SizedBox(height: 16),
+        _buildCODSelector(),
+        const SizedBox(height: 12),
         _buildPaymentDetails(_totalItems, _calculateTotal()),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildCODSelector() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.money, color: AppTheme.primaryColor, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "Cash on Delivery",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    "Pay 5% now, rest on delivery.",
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: _isCashOnDelivery,
+              activeColor: AppTheme.primaryColor,
+              onChanged: (val) {
+                setState(() {
+                  _isCashOnDelivery = val;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -600,6 +651,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildPaymentDetails(int itemCount, int total) {
+    double onlinePay = _isCashOnDelivery ? (total * 0.05).ceilToDouble() : total.toDouble();
+    double codPay = _isCashOnDelivery ? (total - onlinePay) : 0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -610,14 +663,19 @@ class _CartScreenState extends State<CartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Payment Details",
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text("Payment Details", style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
           _paymentRow("Price ($itemCount items)", total),
           _paymentRow("Discount", 0),
           _paymentRow("Delivery Charges", "FREE"),
-          const Divider(),
-          _paymentRow("Total Amount", total, isBold: true),
+          if (_isCashOnDelivery) ...[
+            const Divider(),
+            _paymentRow("Pay Now (5%)", onlinePay, isBold: true),
+            _paymentRow("Cash on Delivery", codPay, isBold: true),
+          ] else ...[
+            const Divider(),
+            _paymentRow("Total Amount", total, isBold: true),
+          ],
         ],
       ),
     );
@@ -648,7 +706,8 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildBottomBar(int total) {
     bool hasOutOfStockItems = _hasOutOfStockItems();
-    
+    double onlinePay = _isCashOnDelivery ? (total * 0.05).ceilToDouble() : total.toDouble();
+    double codPay = _isCashOnDelivery ? (total - onlinePay) : 0;
     return SafeArea(
       child: Container(
         height: 60,
@@ -665,14 +724,19 @@ class _CartScreenState extends State<CartScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "₹$total",
+                  _isCashOnDelivery ? "Pay Now: ₹$onlinePay" : "₹$total",
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.red,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (hasOutOfStockItems)
+                if (_isCashOnDelivery)
+                  Text(
+                    "Cash on Delivery: ₹$codPay",
+                    style: const TextStyle(fontSize: 12, color: Colors.green),
+                  )
+                else if (hasOutOfStockItems)
                   const Text(
                     "Some items are out of stock",
                     style: TextStyle(fontSize: 10, color: Colors.red),
@@ -688,12 +752,17 @@ class _CartScreenState extends State<CartScreen> {
               onPressed: hasOutOfStockItems ? null : () {
                 final totalAmount = _cartItems.fold(
                     0, (sum, item) => sum + item.subTotal.toInt());
+                double onlinePay = _isCashOnDelivery ? (totalAmount * 0.05).ceilToDouble() : totalAmount.toDouble();
+                double codPay = _isCashOnDelivery ? (totalAmount - onlinePay) : 0;
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => CheckoutScreen(
                       cartItems: _cartItems,
                       totalAmount: totalAmount,
+                      isCashOnDelivery: _isCashOnDelivery,
+                      onlinePay: onlinePay,
+                      codPay: codPay,
                     ),
                   ),
                 );
@@ -707,7 +776,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
               child: Text(
-                hasOutOfStockItems ? "Out of Stock" : "Proceed",
+                hasOutOfStockItems ? "Out of Stock" : (_isCashOnDelivery ? "Pay 5% Now" : "Proceed"),
                 style: const TextStyle(color: Colors.white),
               ),
             ),

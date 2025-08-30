@@ -77,6 +77,7 @@ class _UpdateUserPageState extends State<UpdateUserPage> {
                           horizontal: 40, vertical: 14),
                     ),
                     onPressed: () {
+                      FocusScope.of(context).unfocus();
                       // Submit logic
                       Navigator.pop(context);
                     },
